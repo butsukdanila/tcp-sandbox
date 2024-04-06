@@ -1,4 +1,4 @@
-#include "x-log.h"
+#include "x-logs.h"
 
 const char *
 __FILE_NAME__resolve(

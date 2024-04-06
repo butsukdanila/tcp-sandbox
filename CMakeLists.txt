@@ -15,8 +15,10 @@ if (USE_ASAN)
   add_compile_options(-fsanitize=address -fno-omit-frame-pointer -static-libasan)
 endif()
 
-add_subdirectory(lib/x-tcp)
-link_libraries(${X_TCPLIB})
+add_subdirectory(x-base)
+add_subdirectory(x-server-api)
 
-add_executable(${X_SERVER} src/x-server.c)
-add_executable(${X_CLIENT} src/x-client.c)
+link_libraries(${X_BASE_LIB} ${X_SERVER_API_LIB})
+
+add_executable(${X_SERVER} x-server/x-server.c)
+add_executable(${X_CLIENT} x-client/x-client.c)

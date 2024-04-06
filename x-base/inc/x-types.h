@@ -1,5 +1,5 @@
-#ifndef __X_TCP_TYPES_H__
-#define __X_TCP_TYPES_H__
+#ifndef __X_TYPES_H__
+#define __X_TYPES_H__
 
 #include <bits/wordsize.h>
 
@@ -23,4 +23,4 @@ typedef signed   long long int s64;
 typedef unsigned long long int u64;
 #endif
 
-#endif//__X_TCP_TYPES_H__
+#endif//__X_TYPES_H__

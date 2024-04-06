@@ -1,41 +1,36 @@
 #define _GNU_SOURCE // getline()
-#include "x-tcp.h"
-#include "x-log.h"
-
-#include <sys/fcntl.h>
-#include <sys/socket.h>
+#include "x-server-api.h"
+#include "x-logs.h"
+#include "x-inet.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <getopt.h>
 
-#include <netdb.h>
-#include <arpa/inet.h>
-
 #define ADDR_DEF "127.0.0.1"
 #define PORT_DEF "4200"
 
-#define x_tcp_frame_xchg_ex(_fd, _req, _rsp) ({     \
-  int rc = x_tcp_frame_xchg((_fd), (_req), (_rsp)); \
-  if (rc == -1) {                                   \
-    loge_errno("x_tcp_frame_send failure");         \
-  } else if (rc == -2) {                            \
-    loge_errno("x_tcp_frame_recv failure");         \
-  } else if (rc == -3) {                            \
-    x_tcp_error_t * err = (_rsp)->body;             \
-    loge(                                           \
-      "[XERR][%u][%u]: %s",                         \
-      err->auth, err->code, err->text               \
-    );                                              \
-  }                                                 \
-  rc;                                               \
+#define xs_frame_xchg_ex(_fd, _req, _rsp) ({     \
+  int rc = xs_frame_xchg((_fd), (_req), (_rsp)); \
+  if (rc == -1) {                                \
+    loge_errno("xs_frame_send failure");         \
+  } else if (rc == -2) {                         \
+    loge_errno("xs_frame_recv failure");         \
+  } else if (rc == -3) {                         \
+    xs_error_t * err = (_rsp)->body;             \
+    loge(                                        \
+      "[XERR][%u][%u]: %s",                      \
+      err->auth, err->code, err->text            \
+    );                                           \
+  }                                              \
+  rc;                                            \
 })
 
 typedef struct {
   char * addr;
   char * port;
-} args_t;
+} xc_args_t;
 
 static void __usage(FILE * file, char * program) {
   fprintf(file,
@@ -54,7 +49,7 @@ static void __usage(FILE * file, char * program) {
   );
 }
 
-static void args_get(args_t * args, int argc, char ** argv) {
+static void __parse_args(xc_args_t * args, int argc, char ** argv) {
   const char          __opts_s[] = "a:p:h";
   const struct option __opts_l[] = {
     { "address", required_argument, NULL, 'a' },
@@ -86,24 +81,24 @@ typedef enum {
 
 static int xc_cmd_ping(int sock) {
   logi("ping...");
-  x_tcp_frame_t req = x_tcp_frame_req(X_TCP_OP_PING);
-  x_tcp_frame_t rsp = {};
-  if (x_tcp_frame_xchg_ex(sock, &req, &rsp) < 0) {
+  xs_frame_t req = xs_frame_req(XS_OP_PING);
+  xs_frame_t rsp = {};
+  if (xs_frame_xchg_ex(sock, &req, &rsp) < 0) {
     return -1;
   }
 
   logi("...%s", (char *)rsp.body);
-  x_tcp_frame_dispose(&req);
-  x_tcp_frame_dispose(&rsp);
+  xs_frame_dispose(&req);
+  xs_frame_dispose(&rsp);
   return 0;
 }
 
 int main(int argc, char ** argv) {
-  args_t * args = &(args_t) {
+  xc_args_t * args = &(xc_args_t) {
     .addr = ADDR_DEF,
     .port = PORT_DEF,
   };
-  args_get(args, argc, argv);
+  __parse_args(args, argc, argv);
 
   struct sockaddr_in s_addr = {
     .sin_family      = AF_INET,

@@ -1,10 +1,9 @@
-#ifndef __X_LOG_H__
-#define __X_LOG_H__
+#ifndef __X_LOGS_H__
+#define __X_LOGS_H__
 
 #include <stdio.h>  // fprintf, stdout, stderr
-#include <unistd.h> // getpid
-#include <string.h> // strerror
 #include <errno.h>  // errno
+#include <string.h> // strerror
 
 const char * 
 __FILE_NAME__resolve(
@@ -25,4 +24,4 @@ static __thread const char * __FILE_NAME__tl_name __attribute__((unused));
 #define logi_cycle(_fmt, ...) fprintf(stdout, "\033[A\33[2K\r[inf][%s:%d]: " _fmt "\n", __FILE_NAME__, __LINE__, ##__VA_ARGS__)
 #define loge_errno(_dsc)      loge(_dsc ": %s (%d)", strerror(errno), errno)
 
-#endif//__X_LOG_H__
+#endif//__X_LOGS_H__

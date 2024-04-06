@@ -1,0 +1,11 @@
+#!/bin/bash
+
+pushd $(dirname $(realpath $0)) > /dev/null
+
+if [ -f build/x-server ]; then
+  ./build/x-server "$@"
+else
+  echo "x-server not found" >& 2
+fi
+
+popd > /dev/null

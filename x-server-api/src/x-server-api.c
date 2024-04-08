@@ -1,6 +1,7 @@
 #include "x-server-api.h"
 #include "x-logs.h"
 
+#include <sys/fcntl.h>
 #include <sys/socket.h>
 
 #include <stdlib.h>
@@ -8,26 +9,20 @@
 #include <string.h>
 
 void xs_frame_zero(xs_frame_t * frame) {
-  if (!frame) {
-    return;
-  }
+  if (!frame) return;
   if (frame->body && frame->head.body_sz) {
     memset(frame->body, 0, frame->head.body_sz);
   }
   memset(frame, 0, sizeof(*frame));
 }
 
-void xs_frame_dispose(xs_frame_t * frame) {
-  if (!frame) {
-    return;
-  }
+void xs_frame_disp(xs_frame_t * frame) {
+  if (!frame) return;
   free(frame->body);
 }
 
 void xs_frame_free(xs_frame_t * frame) {
-  if (!frame) {
-    return;
-  }
+  if (!frame) return;
   xs_frame_dispose(frame);
   free(frame);
 }
@@ -98,7 +93,7 @@ int xs_frame_xchg(int fd, const xs_frame_t * req, xs_frame_t * rsp) {
 void xs_error_set0(xs_frame_t * frame, const xs_error_t * err) {
   frame->head.op_flag = XS_OP_FLAG_FAILURE;
   xs_frame_body_set(frame, err, sizeof(*err));
-  loge("[XERR][%u][%u] %s", err->auth, err->code, err->text);
+  loge("[xs_error][%u][%u] %s", err->auth, err->code, err->text);
 }
 
 void xs_error_set1(xs_frame_t * frame, u08 auth, u08 code, const char * format, ...) {

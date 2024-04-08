@@ -3,12 +3,11 @@
 
 #include "x-server-defs.h"
 
-#define xs_frame_rsp(_code)      \
-  (xs_frame_t) {                 \
-    .head = {                    \
-      .op_type = XS_OP_TYPE_RSP, \
-      .op_code = _code           \
-    }                            \
+#define xs_frame_rsp()          \
+  (xs_frame_t) {                \
+    .head = {                   \
+      .op_type = XS_OP_TYPE_RSP \
+    }                           \
   }
 
 #define xs_frame_req(_code)      \
@@ -20,7 +19,7 @@
   }
 
 void xs_frame_zero(xs_frame_t * frame);
-void xs_frame_dispose(xs_frame_t * frame);
+void xs_frame_disp(xs_frame_t * frame);
 void xs_frame_free(xs_frame_t * frame);
 
 void * xs_frame_body_realloc(xs_frame_t * frame, u32 body_sz);

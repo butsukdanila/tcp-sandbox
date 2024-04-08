@@ -2,8 +2,10 @@
 
 pushd $(dirname $(realpath $0)) > /dev/null
 
-if [ -f build/x-server ]; then
-  ./build/x-server "$@"
+x_server=build/x-server/x-server
+
+if [ -f $x_server ]; then
+  $x_server "$@"
 else
   echo "x-server not found" >& 2
 fi

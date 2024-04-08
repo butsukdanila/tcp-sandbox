@@ -2,8 +2,10 @@
 
 pushd $(dirname $(realpath $0)) > /dev/null
 
-if [ -f build/x-client ]; then
-  ./build/x-client "$@"
+x_client="build/x-client/x-client"
+
+if [ -f $x_client ]; then
+  $x_client "$@"
 else
   echo "x-client not found" >& 2
 fi

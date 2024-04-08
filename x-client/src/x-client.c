@@ -32,7 +32,7 @@ typedef struct {
   char * port;
 } xc_args_t;
 
-static void __usage(FILE * file, char * program) {
+static void xc_usage(FILE * file, char * program) {
   fprintf(file,
     "Usage: %s [opts] [addr [port]]\n"
     "\n"
@@ -49,7 +49,7 @@ static void __usage(FILE * file, char * program) {
   );
 }
 
-static void __parse_args(xc_args_t * args, int argc, char ** argv) {
+static void xc_args_parse(xc_args_t * args, int argc, char ** argv) {
   const char          __opts_s[] = "a:p:h";
   const struct option __opts_l[] = {
     { "address", required_argument, NULL, 'a' },
@@ -63,8 +63,8 @@ static void __parse_args(xc_args_t * args, int argc, char ** argv) {
     switch(c) {
       case 'a': args->addr = optarg;       break;
       case 'p': args->port = optarg;       break;
-      case 'h': __usage(stdout, argv[0]);  exit(EXIT_SUCCESS);
-      default : __usage(stderr, argv[0]);  exit(EXIT_FAILURE);
+      case 'h': xc_usage(stdout, argv[0]);  exit(EXIT_SUCCESS);
+      default : xc_usage(stderr, argv[0]);  exit(EXIT_FAILURE);
     }
   }
   if (optind < argc) {
@@ -88,8 +88,8 @@ static int xc_cmd_ping(int sock) {
   }
 
   logi("...%s", (char *)rsp.body);
-  xs_frame_dispose(&req);
-  xs_frame_dispose(&rsp);
+  xs_frame_disp(&req);
+  xs_frame_disp(&rsp);
   return 0;
 }
 
@@ -98,7 +98,7 @@ int main(int argc, char ** argv) {
     .addr = ADDR_DEF,
     .port = PORT_DEF,
   };
-  __parse_args(args, argc, argv);
+  xc_args_parse(args, argc, argv);
 
   struct sockaddr_in s_addr = {
     .sin_family      = AF_INET,

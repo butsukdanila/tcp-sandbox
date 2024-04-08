@@ -5,7 +5,10 @@
 #include <string.h>
 #include <ctype.h>
 
-static size_t _printx(char * dst, size_t dst_sz, const u08 * src, size_t src_sz) {
+#include <sys/fcntl.h>
+
+static size_t
+_printx(char * dst, size_t dst_sz, const u08 * src, size_t src_sz) {
   static const char __hex[] = "0123456789abcdef";
   for (size_t i = 0; i < dst_sz; ++i) {
     if (i < src_sz) {
@@ -21,7 +24,8 @@ static size_t _printx(char * dst, size_t dst_sz, const u08 * src, size_t src_sz)
   return dst_sz * 3;
 }
 
-static size_t _printc(char * dst, size_t dst_sz, const u08 * src, size_t src_sz) {
+static size_t
+_printc(char * dst, size_t dst_sz, const u08 * src, size_t src_sz) {
   for (size_t i = 0; i < dst_sz; ++i) {
     if (i < src_sz) {
       u08 c = *src++;
@@ -33,9 +37,10 @@ static size_t _printc(char * dst, size_t dst_sz, const u08 * src, size_t src_sz)
   return dst_sz;
 }
 
-char * x_hexdump(const void * src, size_t src_sz) {
+char *
+x_hexdump(const void * src, size_t src_sz) {
   size_t line_max = 0x10;
-  size_t line_len = (8) + (2) + (line_max * 3) + (1) + (1) + (line_max) + (1) + (1);  
+  size_t line_len = (8) + (2) + (line_max * 3) + (1) + (1) + (line_max) + (1) + (1);
   size_t line_dev = src_sz / line_max;
   size_t line_rem = src_sz % line_max;
   size_t line_cnt = line_dev + (line_rem ? 1 : 0);
@@ -53,4 +58,31 @@ char * x_hexdump(const void * src, size_t src_sz) {
     tmp_src += line_cur;
   }
   return dst;
+}
+
+bool 
+x_fd_has_flag(int fd, int flag) {
+  int fdf = fcntl(fd, F_GETFD);
+  if (fdf < 0) {
+    return false;
+  }
+  return fdf & flag;
+}
+
+int
+x_fd_add_flag(int fd, int flag) {
+  int fdf = fcntl(fd, F_GETFD);
+  if (fdf < 0) {
+    return -1;
+  }
+  return fcntl(fd, F_SETFD, fdf | flag);
+}
+
+int
+x_fd_del_flag(int fd, int flag) {
+  int fdf = fcntl(fd, F_GETFD);
+  if (fdf < 0) {
+    return -1;
+  }
+  return fcntl(fd, F_SETFD, fdf & ~flag);
 }

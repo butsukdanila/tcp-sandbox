@@ -4,9 +4,9 @@
 #include "x-types.h"
 
 typedef struct {
-  u08 op_type : 1;
-  u08 op_flag : 7;
-  u08 op_slot;
+  u08 op_type :  1;
+  u08 op_flag :  1;
+  u16 op_slot : 14;
   u16 op_code;
   u32 body_sz;
 } xs_frame_head_t;
@@ -17,7 +17,8 @@ typedef struct {
 } xs_frame_t;
 
 typedef enum {
-  XS_OP_PING = 0x00
+  XS_OP_PING    = 0x00,
+  XS_OP_MESSAGE = 0x01,
 } xs_op_code_t;
 
 typedef enum {
@@ -38,7 +39,7 @@ typedef struct {
 
 typedef enum {
   XS_ERROR_AUTH_ANY = 0x00, // server error
-  XS_ERROR_AUTH_SYS = 0x01, // system errno-like errors
+  XS_ERROR_AUTH_SYS = 0x01, // system errno
 } xs_error_auth_t;
 
 typedef enum {

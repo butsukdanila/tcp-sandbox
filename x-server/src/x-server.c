@@ -148,7 +148,6 @@ main(int argc, char ** argv) {
   srvpfd->events = POLLIN;
 
   while (1) {
-    logi("polling...");
     xs_pollfds_revents_reset(pfds);
     if (poll(pfds->buf, pfds->len, -1) < 0) {
       loge_errno("poll failure");

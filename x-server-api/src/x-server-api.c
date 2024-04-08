@@ -23,7 +23,7 @@ void xs_frame_disp(xs_frame_t * frame) {
 
 void xs_frame_free(xs_frame_t * frame) {
   if (!frame) return;
-  xs_frame_dispose(frame);
+  xs_frame_disp(frame);
   free(frame);
 }
 

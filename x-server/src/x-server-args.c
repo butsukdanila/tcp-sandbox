@@ -28,7 +28,7 @@ __parser(int key, char * arg, struct argp_state * state) {
   return 0;
 }
 
-void 
+void
 xs_args_parse(int argc, char ** argv, xs_args_t * args) {
   argp_parse(
     &(struct argp) {
@@ -43,7 +43,7 @@ xs_args_parse(int argc, char ** argv, xs_args_t * args) {
         { "clients-grow", 'C',      0, 0, "Allow growing over CMAX (default: "tostr(XS_CLIENTS_GROW_DEF)")", 2 },
         { /*sentinel*/ }
       }
-    }, 
+    },
     argc, argv, 0, 0, args
-  );  
+  );
 }

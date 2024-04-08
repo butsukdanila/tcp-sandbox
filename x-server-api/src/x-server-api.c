@@ -8,7 +8,8 @@
 #include <stdarg.h>
 #include <string.h>
 
-void xs_frame_zero(xs_frame_t * frame) {
+void
+xs_frame_zero(xs_frame_t * frame) {
   if (!frame) return;
   if (frame->body && frame->head.body_sz) {
     memset(frame->body, 0, frame->head.body_sz);
@@ -16,27 +17,32 @@ void xs_frame_zero(xs_frame_t * frame) {
   memset(frame, 0, sizeof(*frame));
 }
 
-void xs_frame_disp(xs_frame_t * frame) {
+void
+xs_frame_disp(xs_frame_t * frame) {
   if (!frame) return;
   free(frame->body);
 }
 
-void xs_frame_free(xs_frame_t * frame) {
+void
+xs_frame_free(xs_frame_t * frame) {
   if (!frame) return;
   xs_frame_disp(frame);
   free(frame);
 }
 
-void * xs_frame_body_realloc(xs_frame_t * frame, u32 body_sz) {
+void *
+xs_frame_body_realloc(xs_frame_t * frame, u32 body_sz) {
   return frame->body = realloc(frame->body, frame->head.body_sz = body_sz);
 }
 
-void xs_frame_body_set(xs_frame_t * frame, const void * buf, size_t buf_sz) {
+void
+xs_frame_body_set(xs_frame_t * frame, const void * buf, size_t buf_sz) {
   xs_frame_body_realloc(frame, (u32)buf_sz);
   memcpy(frame->body, buf, frame->head.body_sz);
 }
 
-int xs_frame_send(int fd, const xs_frame_t * frame) {
+int
+xs_frame_send(int fd, const xs_frame_t * frame) {
   if (send(fd, &frame->head, sizeof(frame->head), 0) <= 0) {
     return -1;
   }
@@ -53,7 +59,8 @@ int xs_frame_send(int fd, const xs_frame_t * frame) {
   return 0;
 }
 
-int xs_frame_recv(int fd, xs_frame_t * frame) {
+int
+xs_frame_recv(int fd, xs_frame_t * frame) {
   xs_frame_head_t head = {};
   if (recv(fd, &head, sizeof(head), 0) <= 0) {
     return -1;
@@ -77,7 +84,8 @@ int xs_frame_recv(int fd, xs_frame_t * frame) {
   return 0;
 }
 
-int xs_frame_xchg(int fd, const xs_frame_t * req, xs_frame_t * rsp) {
+int
+xs_frame_xchg(int fd, const xs_frame_t * req, xs_frame_t * rsp) {
   if (xs_frame_send(fd, req) < 0) {
     return -1;
   }
@@ -90,13 +98,15 @@ int xs_frame_xchg(int fd, const xs_frame_t * req, xs_frame_t * rsp) {
   return 0;
 }
 
-void xs_error_set0(xs_frame_t * frame, const xs_error_t * err) {
+void
+xs_error_set0(xs_frame_t * frame, const xs_error_t * err) {
   frame->head.op_flag = XS_OP_FLAG_FAILURE;
   xs_frame_body_set(frame, err, sizeof(*err));
   loge("[xs_error][%u][%u] %s", err->auth, err->code, err->text);
 }
 
-void xs_error_set1(xs_frame_t * frame, u08 auth, u08 code, const char * format, ...) {
+void
+xs_error_set1(xs_frame_t * frame, u08 auth, u08 code, const char * format, ...) {
   xs_error_t err = {
     .auth = auth,
     .code = code,

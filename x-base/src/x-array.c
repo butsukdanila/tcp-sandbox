@@ -22,7 +22,7 @@ __array_maybe_expand(__array_ext_t * arr, size_t exp) {
   arr->buf = realloc(
     arr->buf,
     x_array_off(
-      arr, 
+      arr,
       arr->cap = req
     )
   );

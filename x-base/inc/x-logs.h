@@ -5,7 +5,7 @@
 #include <errno.h>  // errno
 #include <string.h> // strerror
 
-const char * 
+const char *
 __FILE_NAME__resolve(
   const char *  __file,
   const char ** __pfile_path,

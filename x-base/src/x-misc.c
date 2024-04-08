@@ -7,7 +7,8 @@
 
 #include <sys/fcntl.h>
 
-static size_t
+static
+size_t
 _printx(char * dst, size_t dst_sz, const u08 * src, size_t src_sz) {
   static const char __hex[] = "0123456789abcdef";
   for (size_t i = 0; i < dst_sz; ++i) {
@@ -24,7 +25,8 @@ _printx(char * dst, size_t dst_sz, const u08 * src, size_t src_sz) {
   return dst_sz * 3;
 }
 
-static size_t
+static
+size_t
 _printc(char * dst, size_t dst_sz, const u08 * src, size_t src_sz) {
   for (size_t i = 0; i < dst_sz; ++i) {
     if (i < src_sz) {
@@ -60,7 +62,7 @@ x_hexdump(const void * src, size_t src_sz) {
   return dst;
 }
 
-bool 
+bool
 x_fd_has_flag(int fd, int flag) {
   int fdf = fcntl(fd, F_GETFD);
   if (fdf < 0) {

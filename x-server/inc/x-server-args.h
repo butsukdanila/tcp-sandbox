@@ -26,7 +26,7 @@ typedef struct {
     .clients_grow = XS_CLIENTS_GROW_DEF  \
   }
 
-void 
+void
 xs_args_parse(int argc, char ** argv, xs_args_t * args);
 
 #endif//__X_SERVER_ARGS_H__

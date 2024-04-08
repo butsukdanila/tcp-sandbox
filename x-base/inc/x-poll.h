@@ -13,7 +13,11 @@ typedef struct {
   size_t     cur_sz;
 } x_pollfd_ctx_t;
 
-int x_pollfd_send(x_pollfd_ctx_t * ctx);
-int x_pollfd_recv(x_pollfd_ctx_t * ctx);
+int
+x_pollfd_send(x_pollfd_ctx_t * ctx);
+
+int
+x_pollfd_recv(x_pollfd_ctx_t * ctx);
+
 
 #endif//__X_POLL_H__

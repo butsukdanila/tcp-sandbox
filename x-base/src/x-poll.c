@@ -1,5 +1,4 @@
 #include "x-poll.h"
-#include "x-misc.h"
 #include "x-array.h"
 
 #include <stdlib.h>

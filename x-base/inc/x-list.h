@@ -2,7 +2,6 @@
 #define __X_LIST_H__
 
 #include "x-types.h"
-#include "x-misc.h"
 
 struct list {
   struct list *next;
@@ -51,7 +50,7 @@ list_insert_tail(list_t *node, list_t *root) {
        _node  = (_node)->next)
 
 #define list_data(_node, _type, _member) \
-  container_of(_node, _type, _member)
+  containerof(_node, _type, _member)
 
 #define list_head_data(_root, _type, _member) \
   list_data((_root)->next, _type, _member)
@@ -76,15 +75,5 @@ list_insert_tail(list_t *node, list_t *root) {
       &_data->_member != (_head); \
        _data = _temp, \
        _temp = list_next_data(_temp, _member))
-
-static inline size_t
-list_size(list_t *root) {
-  size_t  size = 0;
-  list_t *node = null;
-  list_foreach(node, root) {
-    size++;
-  }
-  return size;
-}
 
 #endif//__X_LIST_H__

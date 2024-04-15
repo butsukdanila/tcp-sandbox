@@ -1,8 +1,6 @@
-#define _GNU_SOURCE // getaddrinfo etc.
-
 #include "x-inet.h"
-#include "x-misc.h"
 #include "x-logs.h"
+#include "x-util.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -49,69 +47,27 @@ sockaddr_in_addrstr(const void *__sa) {
   );
 }
 
-int
-socket_ext(const char * address, const char * port, int flags) {
-	logi("[socket] address info...");
-	addrinfo_t *ai_hint = &(addrinfo_t) {
-		.ai_family   = PF_UNSPEC,
-		.ai_socktype = SOCK_STREAM,
-		.ai_flags    = AI_PASSIVE
-	};
-	addrinfo_t *ai = null;
-	int rc = getaddrinfo(address, port, ai_hint, &ai);
-	if (rc < 0) {
-		loge("[socket] getaddrinfo failure: %s (%d)", gai_strerror(rc), rc);
-		return -1;
-	}
-
-	logi("[socket] probing...");
-	int fd = -1;
-	for (addrinfo_t *p = ai; p; p = p->ai_next) {
-		fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-		if (fd < 0) {
-			loge_errno("[socket] failure");
-			continue;
-		}
-		if (fd_flag_add(fd, flags) < 0) {
-			loge_errno("[socket] fd add flag failure");
-			goto __probe_next;
-		}
-		if (bind(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
-			loge_errno("[socket] bind failure");
-			goto __probe_next;
-		}
-		// success
-		break;
-
-	__probe_next:
-		close(fd);
-		fd = -1;
-	}
-	freeaddrinfo(ai);
-	return fd;
-}
-
 static int
 getnameany(
-	int fd, char ** addr, in_port_t * port, 
-	int (* call)(int __fd, __SOCKADDR_ARG __addr, socklen_t *__restrict __len)
+  int fd, char ** addr, in_port_t * port,
+  int (* call)(int __fd, __SOCKADDR_ARG __addr, socklen_t *__restrict __len)
 ) {
-	sockaddr_storage_t sa_storage    = {};
-	socklen_t          sa_storage_sz = sizeof(sa_storage);
-	if (call(fd, as_sockaddr(&sa_storage), &sa_storage_sz) < 0) {
-		return -1;
-	}
-	*addr = sockaddr_in_addrstr(&sa_storage);
-	*port = sockaddr_in_port(&sa_storage);
-	return 0;
+  sockaddr_storage_t sa_storage    = {};
+  socklen_t          sa_storage_sz = sizeof(sa_storage);
+  if (call(fd, as_sockaddr(&sa_storage), &sa_storage_sz) < 0) {
+    return -1;
+  }
+  *addr = sockaddr_in_addrstr(&sa_storage);
+  *port = sockaddr_in_port(&sa_storage);
+  return 0;
 }
 
 int
 getpeernamestr(int fd, char ** addr, in_port_t * port) {
-	return getnameany(fd, addr, port, getpeername);
+  return getnameany(fd, addr, port, getpeername);
 }
 
 int
 getsocknamestr(int fd, char ** addr, in_port_t * port) {
-	return getnameany(fd, addr, port, getsockname);
+  return getnameany(fd, addr, port, getsockname);
 }

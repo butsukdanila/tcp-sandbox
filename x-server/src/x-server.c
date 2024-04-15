@@ -1,11 +1,9 @@
-#define _GNU_SOURCE // getaddrinfo etc.
-
 #include "x-server.h"
 #include "x-server-api.h"
 #include "x-server-api-xchg.h"
 #include "x-logs.h"
+#include "x-util.h"
 #include "x-inet.h"
-#include "x-misc.h"
 #include "x-list.h"
 
 #include <assert.h>
@@ -13,8 +11,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <limits.h>
-
-#include <sys/fcntl.h>
 
 typedef enum {
   CXS_RECV = 0,
@@ -43,7 +39,7 @@ static void
 client_init(client_t *client, pollfd_t *pfd, char *addr, in_port_t port) {
   client->state = CXS_RECV;
   client->xchg.ctx.pfd = pfd;
-  server_frame_xchg_recv_prepare(&client->xchg);
+  server_frame_xchg_recv_prep(&client->xchg);
   client->addr = addr;
   client->port = port;
   client->msgc = 0;
@@ -74,7 +70,7 @@ server_op_ping(client_t *client __unused, server_frame_t *rsp) {
 
 static void
 server_op_message(client_t *client, server_frame_t *rsp __unused) {
-  logi_client(client, "MESSAGE[%zu]: %s",
+  logi_client(client, "MESSAGE[%03zu]: %s",
     client->msgc++,
     (char *)client->xchg.frame.body);
 }
@@ -98,9 +94,9 @@ static int
 client_xchg(client_t *client) {
   if (client->state == CXS_RECV) {
     int rc = server_frame_xchg_recv(&client->xchg);
-    if (rc == SXR_SUCCESS) {
+    if (rc == SUCCESS) {
       client->xchg.frame = server_op_callback(client);
-      server_frame_xchg_send_prepare(&client->xchg);
+      server_frame_xchg_send_prep(&client->xchg);
       client->state = CXS_SEND;
     }
     // logi_client(client, "[RECV] %d", rc);
@@ -108,15 +104,15 @@ client_xchg(client_t *client) {
   }
   if (client->state == CXS_SEND) {
     int rc = server_frame_xchg_send(&client->xchg);
-    if (rc == SXR_SUCCESS) {
-      server_frame_xchg_recv_prepare(&client->xchg);
+    if (rc == SUCCESS) {
+      server_frame_xchg_recv_prep(&client->xchg);
       client->state = CXS_RECV;
     }
     // logi_client(client, "[SEND] %d", rc);
     return rc;
   }
   loge_client(client, "something went horribly wrong");
-  return SXR_FAILURE;
+  return FAILURE;
 }
 
 struct server {
@@ -179,17 +175,21 @@ server_socket(const char *address, const char *port, const int backlog) {
 static int
 server_client_init(server_t *server) {
   if (!(server->pfd->revents & POLLIN)) {
-    return SXR_IGNORED;
+    return IGNORED;
   }
   pollfd_t *pfd = pollfd_pool_borrow(server->pfdpool);
   if (!pfd) {
     loge("client failed to borrow pollfd");
-    return SXR_FAILURE;
-  };
-  if ((pfd->fd = accept4(server->pfd->fd, null, null, SOCK_NONBLOCK)) < 0) {
+    return FAILURE;
+  }
+  if ((pfd->fd = accept(server->pfd->fd, null, null)) < 0) {
     loge_errno("client socket accept failure");
     goto __err;
-   }
+  }
+  if (fd_addfl(pfd->fd, O_NONBLOCK) < 0) {
+    loge_errno("client socket unblock failure");
+    goto __err;
+  }
   char      *addr;
   in_port_t  port;
   if (getpeernamestr(pfd->fd, &addr, &port) < 0) {
@@ -205,26 +205,26 @@ server_client_init(server_t *server) {
     logi("server pollfd DISABLED...");
     server->pfd->fd = -server->pfd->fd;
   }
-  return SXR_SUCCESS;
+  return SUCCESS;
 
 __err:
   pollfd_pool_return(server->pfdpool, pfd);
-  return SXR_FAILURE;
+  return FAILURE;
 }
 
 static int
 server_client_xchg(server_t *server) {
-  int rc = SXR_IGNORED;
+  int rc = IGNORED;
   client_t *client, *temp;
   clients_foreach_safe(client, temp, &server->clients) {
     switch (rc = client_xchg(client)) {
-      case SXR_PARTIAL: __fallthrough;
-      case SXR_SUCCESS: __fallthrough;
-      case SXR_IGNORED: break;
+      case PARTIAL: __fallthrough;
+      case SUCCESS: __fallthrough;
+      case IGNORED: break;
       default: {
         switch (rc) {
-          case SXR_RUPTURE: logi_client(client, "rupture"); break;
-          case SXR_FAILURE: loge_client(client, "failure"); break;
+          case RUPTURE: logi_client(client, "rupture"); break;
+          case FAILURE: loge_client(client, "failure"); break;
           default:          loge_client(client, "unknown"); break;
         }
         pollfd_pool_return(server->pfdpool, client->xchg.ctx.pfd);
@@ -238,7 +238,7 @@ server_client_xchg(server_t *server) {
       }
     }
   }
-  return SXR_IGNORED;
+  return IGNORED;
 }
 
 server_t *
@@ -269,27 +269,27 @@ int
 server_call(server_t *server) {
   if (server->pfd->revents & POLLERR) {
     loge("server pollfd POLLERR");
-    return SXR_FAILURE;
+    return FAILURE;
   }
   if (server->pfd->revents & POLLNVAL) {
     loge("server pollfd POLLNVAL");
-    return SXR_FAILURE;
+    return FAILURE;
   }
   if (server->pfd->revents & POLLHUP) {
     loge("server pollfd POLLHUP");
-    return SXR_RUPTURE;
+    return FAILURE;
   }
 
   int rc = 0;
   switch ((rc = server_client_init(server))) {
-    case SXR_IGNORED: break;
-    default:          return rc;
+    case IGNORED: break;
+    default:      return rc;
   }
   switch ((rc = server_client_xchg(server))) {
-    case SXR_IGNORED: break;
-    default:          return rc;
+    case IGNORED: break;
+    default:      return rc;
   }
-  return SXR_IGNORED;
+  return IGNORED;
 }
 
 void

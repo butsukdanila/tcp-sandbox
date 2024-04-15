@@ -2,7 +2,7 @@
 #define __X_CLIENT_ARGS_H__
 
 #include "x-types.h"
-#include <time.h>
+#include <sys/time.h>
 
 #define XC_ADDRESS_DEF "127.0.0.1"
 #define XC_PORT_DEF    "4200"

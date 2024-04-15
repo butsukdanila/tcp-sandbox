@@ -24,6 +24,4 @@ static __thread const char *__FILE_NAME__tl_name __attribute__((unused));
 #define logi_cycle(_fmt, ...) fprintf(stdout, "\033[A\33[2K\r[inf][%s:%d]: " _fmt "\n", __FILE_NAME__, __LINE__, ##__VA_ARGS__)
 #define loge_errno(_dsc)      loge(_dsc ": %s (%d)", strerror(errno), errno)
 
-#define logf(_fmt, ...) fprintf(stderr, "[err][%s:%d]: " _fmt "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__)
-
 #endif//__X_LOGS_H__

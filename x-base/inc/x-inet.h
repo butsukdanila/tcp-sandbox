@@ -9,9 +9,11 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
-typedef struct sockaddr     sockaddr_t;
-typedef struct sockaddr_in  sockaddr_in_t;
-typedef struct sockaddr_in6 sockaddr_in6_t;
+typedef struct sockaddr         sockaddr_t;
+typedef struct sockaddr_in      sockaddr_in_t;
+typedef struct sockaddr_in6     sockaddr_in6_t;
+typedef struct addrinfo         addrinfo_t;
+typedef struct sockaddr_storage sockaddr_storage_t;
 
 #define as_sockaddr(x)     ((sockaddr_t     *)(x))
 #define as_sockaddr_in(x)  ((sockaddr_in_t  *)(x))
@@ -43,10 +45,5 @@ getpeernamestr(int fd, char ** addr, in_port_t * port);
 
 int
 getsocknamestr(int fd, char ** addr, in_port_t * port);
-
-#if _POSIX_C_SOURCE >= 200112L
-typedef struct addrinfo         addrinfo_t;
-typedef struct sockaddr_storage sockaddr_storage_t;
-#endif
 
 #endif//__X_INET_H__

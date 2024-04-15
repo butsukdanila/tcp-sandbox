@@ -1,11 +1,10 @@
 #include "x-server-args.h"
-#include "x-misc.h"
+#include "x-util.h"
 
 #include <stdlib.h>
 #include <argp.h>
 
-static
-error_t
+static error_t
 __parser(int key, char *arg, struct argp_state *state) {
   server_args_t *args = state->input;
   switch (key) {

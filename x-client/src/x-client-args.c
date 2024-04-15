@@ -1,5 +1,5 @@
 #include "x-client-args.h"
-#include "x-misc.h"
+#include "x-util.h"
 
 #include <stdlib.h>
 #include <argp.h>

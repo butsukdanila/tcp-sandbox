@@ -4,6 +4,7 @@
 #include <bits/wordsize.h>
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdbool.h>
 
 typedef          char i08;
@@ -29,5 +30,19 @@ typedef unsigned long long int u64;
 #endif
 
 #define null (void *)0
+
+#define containerof(ptr, type, member) \
+	((type *)((void *)(ptr) - offsetof(type, member)))
+
+#define __unused      __attribute__((unused))
+#define __fallthrough __attribute__((fallthrough))
+
+typedef enum {
+  RUPTURE = -2,
+  FAILURE = -1,
+  SUCCESS =  0,
+  IGNORED =  1,
+  PARTIAL =  2,
+} result_t;
 
 #endif//__X_TYPES_H__

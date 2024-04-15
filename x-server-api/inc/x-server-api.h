@@ -4,7 +4,7 @@
 #include "x-server-api-defs.h"
 
 #define server_frame() \
-	(server_frame_t) {}
+  (server_frame_t) {}
 
 #define server_frame_rsp() \
   (server_frame_t) {       \
@@ -35,15 +35,6 @@ server_frame_body_realloc(server_frame_t *frame, u32 body_sz);
 
 void
 server_frame_body_set(server_frame_t *frame, const void *buf, size_t buf_sz);
-
-// int
-// server_frame_send(int fd, const server_frame_t *frame);
-
-// int
-// server_frame_recv(int fd, server_frame_t *frame);
-
-// int
-// server_frame_xchg(int fd, const server_frame_t *req, server_frame_t *rsp);
 
 void
 server_error_set0(server_frame_t *frame, const server_error_t *err);

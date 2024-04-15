@@ -7,7 +7,7 @@
 
 const char *
 __FILE_NAME__resolve(
-  const char * __file,
+  const char  *__file,
   const char **__pfile_path,
   const char **__pfile_name
 );

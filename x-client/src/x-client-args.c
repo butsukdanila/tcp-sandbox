@@ -4,8 +4,7 @@
 #include <stdlib.h>
 #include <argp.h>
 
-static
-error_t
+static error_t
 __parser(int key, char *arg, struct argp_state *state) {
   client_args_t *args = state->input;
   switch (key) {

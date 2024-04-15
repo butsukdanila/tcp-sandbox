@@ -295,6 +295,10 @@ server_call(server_t *server) {
 void
 server_free(server_t *server) {
   if (!server) return;
-  // todo: clients free
+  client_t *client, *temp;
+  clients_foreach_safe(client, temp, &server->clients) {
+    list_unlink(&client->node);
+    client_free(client);
+  }
   free(server);
 }

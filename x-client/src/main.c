@@ -7,10 +7,10 @@
 #include "x-poll-timer.h"
 #include "x-poll-signal.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <assert.h>
 
 typedef enum {
   CXS_WAIT = 0,

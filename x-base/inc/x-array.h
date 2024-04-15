@@ -5,15 +5,15 @@
 #include "x-funcs.h"
 
 struct array {
-  void *buf;
-  size_t len;
+  void   *buf;
+  size_t  len;
 };
 typedef struct array array_t;
 
 struct arraycfg {
   size_t cap;
   size_t obj_size;
-  mutate_f obj_disp;
+  disp_t obj_disp;
 };
 typedef struct arraycfg arraycfg_t;
 

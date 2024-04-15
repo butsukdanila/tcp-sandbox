@@ -28,4 +28,6 @@ typedef signed   long long int s64;
 typedef unsigned long long int u64;
 #endif
 
+#define null (void *)0
+
 #endif//__X_TYPES_H__

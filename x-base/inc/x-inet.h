@@ -27,21 +27,26 @@ typedef struct sockaddr_in6 sockaddr_in6_t;
 })
 
 void *
-sockaddr_in_addr(const void * __sa);
+sockaddr_in_addr(const void *__sa);
 
 in_port_t
-sockaddr_in_port(const void * __sa);
+sockaddr_in_port(const void *__sa);
 
 socklen_t
-sockaddr_in_addrstrlen(const void * __sa);
+sockaddr_in_addrstrlen(const void *__sa);
 
 char *
-sockaddr_in_addrstr(const void * __sa);
+sockaddr_in_addrstr(const void *__sa);
+
+int
+getpeernamestr(int fd, char ** addr, in_port_t * port);
+
+int
+getsocknamestr(int fd, char ** addr, in_port_t * port);
 
 #if _POSIX_C_SOURCE >= 200112L
 typedef struct addrinfo         addrinfo_t;
 typedef struct sockaddr_storage sockaddr_storage_t;
-
 #endif
 
 #endif//__X_INET_H__

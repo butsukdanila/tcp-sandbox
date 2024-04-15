@@ -4,45 +4,59 @@
 #include "x-types.h"
 #include "x-funcs.h"
 
-struct __array {
-  void * buf;
+struct array {
+  void *buf;
   size_t len;
+};
+typedef struct array array_t;
+
+struct arraycfg {
   size_t cap;
   size_t obj_size;
+  mutate_f obj_disp;
 };
-typedef struct __array x_array_t;
+typedef struct arraycfg arraycfg_t;
 
-x_array_t *
-x_array_init(size_t obj_size, x_mut_f obj_free, size_t cap);
-
-void
-x_array_grow(x_array_t * arr);
-
-void *
-x_array_free(x_array_t * arr, bool extract);
-
-void *
-x_array_set(x_array_t * arr, size_t idx, void * objs, size_t objs_len);
-
-void *
-x_array_add(x_array_t * arr, void * objs, size_t objs_len);
+array_t *
+array_new(arraycfg_t cfg);
 
 void
-x_array_del(x_array_t * arr, size_t idx);
+array_grow_ext(array_t *arr, size_t extension);
 
 void
-x_array_del_fast(x_array_t * arr, size_t idx);
+array_grow(array_t *arr);
 
-#define x_array_off(_arr, _idx) \
-  ((_arr)->obj_size * (size_t)(_idx))
+void *
+array_free_ext(array_t *arr, bool extract);
 
-#define x_array_get(_arr, _idx) \
-  ((_arr)->buf + x_array_off(_arr, _idx))
+void
+array_free(array_t *arr);
 
-#define x_array_set_1(_arr, _idx, _val) \
-  x_array_set((_arr), (size_t)(_idx), (_val))
+void *
+array_get(array_t *arr, size_t idx);
 
-#define x_array_add_1(_arr, _val) \
-  x_array_add((_arr), (_val), 1)
+void *
+array_set(array_t *arr, size_t idx, void *objs, size_t objs_len);
+
+void *
+array_add(array_t *arr, void *objs, size_t objs_len);
+
+void *
+array_req(array_t *arr);
+
+void
+array_del(array_t *arr, size_t idx);
+
+void
+array_del_fast(array_t *arr, size_t idx);
+
+bool
+array_capped(array_t *arr);
+
+#define array_set_1(_arr, _idx, _val) \
+  array_set((_arr), (size_t)(_idx), (_val), 1)
+
+#define array_add_1(_arr, _val) \
+  array_add((_arr), (_val), 1)
 
 #endif//__X_ARRAY_H__

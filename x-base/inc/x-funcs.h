@@ -1,8 +1,6 @@
 #ifndef __X_FUNCS_H__
 #define __X_FUNCS_H__
 
-typedef void   (* x_mut_f) (void *);
-typedef char * (* x_str_f) (void *);
-typedef int    (* x_cmp_f) (void *, void *);
+typedef void (*mutate_f) (void *);
 
 #endif//__X_FUNCS_H__

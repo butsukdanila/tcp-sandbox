@@ -4,131 +4,164 @@
 #include <memory.h>
 #include <assert.h>
 
+#define __array_off(_arr, _idx) \
+	((_arr)->cfg.obj_size * (size_t)(_idx))
+
+#define __array_get(_arr, _idx) \
+	((_arr)->buf + __array_off(_arr, _idx))
+
 typedef struct {
-  void *  buf;      /* underlying memory buffer */
-  size_t  len;      /* effective array length   */
-  size_t  cap;      /* current array capacity   */
-  size_t  obj_size; /* size of object in memory */
-  x_mut_f obj_disp; /* dispose object resources */
+	void       *buf;
+	size_t      len;
+	arraycfg_t  cfg;
 } __array_ext_t;
 
-static
-void
-__array_maybe_expand(__array_ext_t * arr, size_t exp) {
-  size_t req = arr->len + exp;
-  if (req <= arr->cap) {
-    return;
-  }
-  arr->buf = realloc(
-    arr->buf,
-    x_array_off(
-      arr,
-      arr->cap = req
-    )
-  );
+static void
+__array_maybe_extend(__array_ext_t *__arr, size_t extension) {
+	size_t req = __arr->len + extension;
+	if (req <= __arr->cfg.cap) {
+		return;
+	}
+	__arr->cfg.cap = req;
+	__arr->buf = realloc(
+		__arr->buf,
+		__array_off(__arr, __arr->cfg.cap)
+	);
 }
 
-x_array_t *
-x_array_init(size_t obj_size, x_mut_f obj_disp, size_t cap) {
-  __array_ext_t * ret = malloc(sizeof(__array_ext_t));
-  ret->buf      = NULL;
-  ret->len      = 0;
-  ret->cap      = 0;
-  ret->obj_size = obj_size;
-  ret->obj_disp = obj_disp;
-  if (cap) {
-    __array_maybe_expand(ret, cap);
-  }
-  return (x_array_t *)ret;
+array_t *
+array_new(arraycfg_t cfg) {
+	__array_ext_t *ret = malloc(sizeof(__array_ext_t));
+	ret->buf = null;
+	ret->len = 0;
+	ret->cfg.cap = 0;
+	ret->cfg.obj_size = cfg.obj_size;
+	ret->cfg.obj_disp = cfg.obj_disp;
+	__array_maybe_extend(ret, cfg.cap);
+	return (array_t *)ret;
 }
 
 void
-x_array_grow(x_array_t * farr) {
-  __array_ext_t * arr = (__array_ext_t *)farr;
-  __array_maybe_expand(
-    arr,
-    arr->cap ? arr->cap * 2 : 1
-  );
+array_grow_ext(array_t *arr, size_t extension) {
+	__array_ext_t *__arr = (__array_ext_t *)arr;
+	__array_maybe_extend(__arr, extension);
+}
+
+void
+array_grow(array_t *arr) {
+	__array_ext_t *__arr = (__array_ext_t *)arr;
+	__array_maybe_extend(__arr, __arr->cfg.cap * 2);
 }
 
 void *
-x_array_free(x_array_t * farr, bool extract) {
-  __array_ext_t * arr = (__array_ext_t *)farr;
-  void * ret = arr->buf;
-  if (!extract) {
-    if (arr->obj_disp) {
-      for (size_t i = 0; i < arr->len; ++i) {
-        arr->obj_disp(x_array_get(arr, i));
-      }
-    }
-    free(arr->buf);
-    ret = NULL;
-  }
-  free(arr);
-  return ret;
-}
-
-void *
-x_array_set(x_array_t * farr, size_t idx, void * objs, size_t objs_len) {
-  __array_ext_t * arr = (__array_ext_t *)farr;
-  assert(objs_len);
-  assert(idx + objs_len < arr->len);
-
-  return memcpy(
-    x_array_get(arr, idx),
-    objs,
-    x_array_off(arr, objs_len)
-  );
-}
-
-void *
-x_array_add(x_array_t * farr, void * objs, size_t objs_len) {
-  __array_ext_t * arr = (__array_ext_t *)farr;
-  assert(objs_len);
-
-  __array_maybe_expand(arr, objs_len);
-  void * ret = memcpy(
-    x_array_get(arr, arr->len),
-    objs,
-    x_array_off(arr, objs_len)
-  );
-  arr->len += objs_len;
-  return ret;
+array_free_ext(array_t *arr, bool extract) {
+	__array_ext_t *__arr = (__array_ext_t *)arr;
+	if (!__arr) {
+		return null;
+	}
+	void *ret = __arr->buf;
+	if (!extract) {
+		if (__arr->cfg.obj_disp) {
+			for (size_t i = 0; i < __arr->len; ++i) {
+				__arr->cfg.obj_disp(__array_get(__arr, i));
+			}
+		}
+		free(__arr->buf);
+		ret = null;
+	}
+	free(__arr);
+	return ret;
 }
 
 void
-x_array_del(x_array_t * farr, size_t idx) {
-  __array_ext_t * arr = (__array_ext_t *)farr;
-  assert(idx < arr->len);
+array_free(array_t *__arr) {
+	array_free_ext(__arr, false);
+}
 
-  if (arr->obj_disp) {
-    arr->obj_disp(x_array_get(arr, idx));
-  }
-  arr->len -= 1;
+void *
+array_get(array_t *arr, size_t idx) {
+	__array_ext_t *__arr = (__array_ext_t *)arr;
+	assert(idx < __arr->len);
+	return __array_get(__arr, idx);
+}
 
-  if (idx == arr->len) {
-    return;
-  }
+void *
+array_set(array_t *arr, size_t idx, void *objs, size_t objs_len) {
+	__array_ext_t *__arr = (__array_ext_t *)arr;
+	assert(objs_len);
+	assert(idx + objs_len < __arr->len);
 
-  memcpy(
-    x_array_get(arr, idx),
-    x_array_get(arr, idx + 1),
-    x_array_off(arr, arr->len)
-  );
+	return memcpy(
+		__array_get(__arr, idx),
+		objs,
+		__array_off(__arr, objs_len)
+	);
+}
+
+void *
+array_add(array_t *arr, void *objs, size_t objs_len) {
+	__array_ext_t *__arr = (__array_ext_t *)arr;
+	assert(objs_len);
+
+	__array_maybe_extend(__arr, objs_len);
+	void *ret = memcpy(
+		__array_get(__arr, __arr->len),
+		objs,
+		__array_off(__arr, objs_len)
+	);
+	__arr->len += objs_len;
+	return ret;
+}
+
+void *
+array_req(array_t *arr) {
+	__array_ext_t *__arr = (__array_ext_t *)arr;
+	__array_maybe_extend(__arr, 1);
+	void * ret = __array_get(__arr, __arr->len);
+	__arr->len++;
+	return memset(ret, 0, __array_off(__arr, 1));
 }
 
 void
-x_array_del_fast(x_array_t * farr, size_t idx) {
-  __array_ext_t * arr = (__array_ext_t *)farr;
-  assert(idx < arr->len);
+array_del(array_t *arr, size_t idx) {
+	__array_ext_t *__arr = (__array_ext_t *)arr;
+	assert(__arr);
+	assert(__arr->len > idx);
 
-  if (arr->obj_disp) {
-    arr->obj_disp(x_array_get(arr, idx));
-  }
-  memcpy(
-    x_array_get(arr, idx),
-    x_array_get(arr, arr->len),
-    x_array_off(arr, 1)
-  );
-  arr->len -= 1;
+	if (__arr->cfg.obj_disp) {
+		__arr->cfg.obj_disp(__array_get(__arr, idx));
+	}
+
+	if (idx != __arr->len - 1) {
+		memmove(
+			__array_get(__arr, idx),
+			__array_get(__arr, idx + 1),
+			__array_off(__arr, __arr->len - idx - 1)
+		);
+	}
+	__arr->len--;
+}
+
+void
+array_del_fast(array_t *arr, size_t idx) {
+	__array_ext_t *__arr = (__array_ext_t *)arr;
+	assert(idx < __arr->len);
+
+	if (__arr->cfg.obj_disp) {
+		__arr->cfg.obj_disp(__array_get(__arr, idx));
+	}
+	if (idx != __arr->len - 1) {
+		memcpy(
+			__array_get(__arr, idx),
+			__array_get(__arr, __arr->len - 1),
+			__array_off(__arr, 1)
+		);
+	}
+	__arr->len--;
+}
+
+bool
+array_capped(array_t *arr) {
+	__array_ext_t *__arr = (__array_ext_t *)arr;
+	return __arr->len == __arr->cfg.cap;
 }

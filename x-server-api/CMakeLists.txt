@@ -3,6 +3,7 @@ set(X_SERVER_API x-server-api)
 add_library(${X_SERVER_API} 
   SHARED
     ${CMAKE_CURRENT_LIST_DIR}/src/x-server-api.c
+		${CMAKE_CURRENT_LIST_DIR}/src/x-server-api-xchg.c
 )
 target_include_directories(${X_SERVER_API} 
   PUBLIC

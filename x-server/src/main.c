@@ -1,0 +1,68 @@
+#define _GNU_SOURCE // getaddrinfo, strsignal, etc.
+
+#include "x-server.h"
+#include "x-server-args.h"
+#include "x-server-api-xchg.h"
+#include "x-logs.h"
+#include "x-misc.h"
+#include "x-poll.h"
+#include "x-poll-signal.h"
+
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <sys/fcntl.h>
+#include <sys/signal.h>
+
+int
+main(int argc, char **argv) {
+	server_args_t *args = &server_args_default();
+	server_args_parse(argc, argv, args);
+
+	pollfd_pool_t *pfdpool = pollfd_pool_new(
+		(/*signal pollfd*/ 1) +
+		(/*server pollfd*/ 1) +
+		(args->clients_cap ? args->clients_cap : (
+			logi("clients capacity can't be zero. defaulting to: "tostr(CLIENTS_CAP_DEF)"..."), 
+			(size_t)CLIENTS_CAP_DEF
+		))
+	);
+
+	pollfd_t *sigpfd = pollfd_pool_borrow(pfdpool);
+	if (signal_pollfd_init(sigpfd, SIG_BLOCK, -1, O_NONBLOCK, SIGINT, SIGTERM) < 0) {
+		goto __end;
+	}
+
+	server_t *server = server_init(args, pfdpool);
+	if (!server) {
+		goto __end;
+	}
+
+	signalfd_siginfo_t siginf = {};
+	while (1) {
+		if (pollfd_pool_poll(pfdpool, -1) < 0) {
+			goto __end;
+		}
+
+		switch (signal_pollfd_call(sigpfd, &siginf)) {
+			case  0: break;
+			case  1: goto __sig;
+			default: goto __end;
+		}
+
+		switch (server_call(server)) {
+			case SXR_IGNORED: __fallthrough;
+			case SXR_SUCCESS: break;
+			default:          goto __end;
+		}
+	}
+__sig:
+	logi("signal pollfd captured: %s (%d)",
+		strsignal((i32)siginf.ssi_signo), (i32)siginf.ssi_signo);
+
+__end:
+	server_free(server);
+	pollfd_pool_free(pfdpool);
+	return 1;
+}

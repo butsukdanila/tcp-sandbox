@@ -1,7 +1,8 @@
 set(X_CLIENT x-client)
 
 add_executable(${X_CLIENT}
-  ${CMAKE_CURRENT_LIST_DIR}/src/x-client.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/main.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/x-client-args.c
 )
 target_include_directories(${X_CLIENT}
   PRIVATE

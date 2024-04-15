@@ -1,9 +1,9 @@
 set(X_SERVER x-server)
 
 add_executable(${X_SERVER}
-  ${CMAKE_CURRENT_LIST_DIR}/src/x-server-args.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/x-server-impl.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/main.c
   ${CMAKE_CURRENT_LIST_DIR}/src/x-server.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/x-server-args.c
 )
 target_include_directories(${X_SERVER}
   PRIVATE

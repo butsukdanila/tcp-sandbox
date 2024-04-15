@@ -3,55 +3,58 @@
 
 #include "x-server-api-defs.h"
 
-#define xs_frame_rsp()          \
-  (xs_frame_t) {                \
+#define server_frame() \
+	(server_frame_t) {}
+
+#define server_frame_rsp() \
+  (server_frame_t) {       \
+    .head = {              \
+      .op_type = SOPT_RSP  \
+    }                      \
+  }
+
+#define server_frame_req(_code) \
+  (server_frame_t) {            \
     .head = {                   \
-      .op_type = XS_OP_TYPE_RSP \
+      .op_type = SOPT_REQ,      \
+      .op_code = _code          \
     }                           \
   }
 
-#define xs_frame_req(_code)      \
-  (xs_frame_t) {                 \
-    .head = {                    \
-      .op_type = XS_OP_TYPE_REQ, \
-      .op_code = _code           \
-    }                            \
-  }
+void
+server_frame_zero(server_frame_t *frame);
 
 void
-xs_frame_zero(xs_frame_t * frame);
+server_frame_disp(server_frame_t *frame);
 
 void
-xs_frame_disp(xs_frame_t * frame);
-
-void
-xs_frame_free(xs_frame_t * frame);
+server_frame_free(server_frame_t *frame);
 
 void *
-xs_frame_body_realloc(xs_frame_t * frame, u32 body_sz);
+server_frame_body_realloc(server_frame_t *frame, u32 body_sz);
 
 void
-xs_frame_body_set(xs_frame_t * frame, const void * buf, size_t buf_sz);
+server_frame_body_set(server_frame_t *frame, const void *buf, size_t buf_sz);
 
-int
-xs_frame_send(int fd, const xs_frame_t * frame);
+// int
+// server_frame_send(int fd, const server_frame_t *frame);
 
-int
-xs_frame_recv(int fd, xs_frame_t * frame);
+// int
+// server_frame_recv(int fd, server_frame_t *frame);
 
-int
-xs_frame_xchg(int fd, const xs_frame_t * req, xs_frame_t * rsp);
-
-void
-xs_error_set0(xs_frame_t * frame, const xs_error_t * err);
+// int
+// server_frame_xchg(int fd, const server_frame_t *req, server_frame_t *rsp);
 
 void
-xs_error_set1(xs_frame_t * frame, u08 auth, u08 code, const char * format, ...);
+server_error_set0(server_frame_t *frame, const server_error_t *err);
 
-#define xs_error_any(_frame, _code, _format, ...) \
-  xs_error_set1(_frame, XS_ERROR_AUTH_ANY, (u08)_code, _format, ##__VA_ARGS__)
+void
+server_error_set1(server_frame_t *frame, u16 auth, u16 code, const char *format, ...);
 
-#define xs_error_sys(_frame, _code, _format, ...) \
-  xs_error_set1(_frame, XS_ERROR_AUTH_SYS, (u08)_code, _format, ##__VA_ARGS__)
+#define server_error_any(_frame, _code, _format, ...) \
+  server_error_set1(_frame, SEA_ANY, (u16)_code, _format, ##__VA_ARGS__)
+
+#define server_error_sys(_frame, _code, _format, ...) \
+  server_error_set1(_frame, SEA_SYS, (u16)_code, _format, ##__VA_ARGS__)
 
 #endif//__X_SERVER_API_H__

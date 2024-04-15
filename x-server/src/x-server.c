@@ -1,205 +1,300 @@
 #define _GNU_SOURCE // getaddrinfo etc.
 
+#include "x-server.h"
 #include "x-server-api.h"
-#include "x-server-args.h"
-#include "x-server-impl.h"
-
+#include "x-server-api-xchg.h"
 #include "x-logs.h"
-#include "x-misc.h"
 #include "x-inet.h"
-#include "x-array.h"
+#include "x-misc.h"
+#include "x-list.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include <sys/fcntl.h>
-#include <sys/signal.h>
-#include <sys/signalfd.h>
 
-typedef struct signalfd_siginfo siginf_t;
+typedef enum {
+  CXS_RECV = 0,
+  CXS_SEND = 1,
+} client_xchg_state_t;
 
-static
-void
-xs_pollfd_disp(void * obj) {
-  pollfd_t * pfd = obj;
-  if (!pfd) return;
-  close(pfd->fd);
+typedef struct {
+  client_xchg_state_t  state;
+  server_frame_xchg_t  xchg;
+  char                *addr;
+  in_port_t            port;
+  size_t               msgc;
+  list_t               node;
+} client_t;
+
+#define clients_foreach_safe(_data, _temp, _head) \
+  list_foreach_data_safe(_data, _temp, _head, node)
+
+#define logi_client(_a, _f, ...) \
+  logi("client[%d] " _f, (_a)->port, ##__VA_ARGS__)
+
+#define loge_client(_a, _f, ...) \
+  loge("client[%d] " _f, (_a)->port, ##__VA_ARGS__)
+
+static void
+client_init(client_t *client, pollfd_t *pfd, char *addr, in_port_t port) {
+  client->state = CXS_RECV;
+  client->xchg.ctx.pfd = pfd;
+  server_frame_xchg_recv_prepare(&client->xchg);
+  client->addr = addr;
+  client->port = port;
+  client->msgc = 0;
+  logi_client(client, "created");
 }
 
-static
-void
-xs_pollfds_revents_reset(x_array_t * pfds) {
-  for (size_t i = 0; i < pfds->len; ++i) {
-    pollfd_t * pfd = x_array_get(pfds, i);
-    pfd->revents = 0;
+static void
+client_disp(void *obj) {
+  client_t *client = obj;
+  if (!client) return;
+  free(client->addr);
+  server_frame_xchg_disp(&client->xchg);
+}
+
+static void
+client_free(void *obj) {
+  client_t *client = obj;
+  if (!client) return;
+  client_disp(client);
+  free(client);
+}
+
+static void
+server_op_ping(client_t *client __unused, server_frame_t *rsp) {
+  static const char pong[] = "pong";
+  server_frame_body_set(rsp, pong, sizeof(pong));
+}
+
+static void
+server_op_message(client_t *client, server_frame_t *rsp __unused) {
+  logi_client(client, "MESSAGE[%zu]: %s",
+    client->msgc++,
+    (char *)client->xchg.frame.body);
+}
+
+static server_frame_t
+server_op_callback(client_t *client) {
+  const server_frame_t *req = &client->xchg.frame;
+  server_frame_t       *rsp = &server_frame_rsp();
+  switch (req->head.op_code) {
+    case SOPC_PING:    server_op_ping(client, rsp);    break;
+    case SOPC_MESSAGE: server_op_message(client, rsp); break;
+    default: {
+      server_error_any(rsp, SE_NOP, "unknown: %u", req->head.op_code);
+      break;
+    }
   }
+  return *rsp;
 }
 
-static
-int
-xs_sigpfd_handle(pollfd_t * sigpfd, siginf_t * siginf) {
-  if (sigpfd->revents & POLLERR) {
-    loge("signal pollfd error");
+static int
+client_xchg(client_t *client) {
+  if (client->state == CXS_RECV) {
+    int rc = server_frame_xchg_recv(&client->xchg);
+    if (rc == SXR_SUCCESS) {
+      client->xchg.frame = server_op_callback(client);
+      server_frame_xchg_send_prepare(&client->xchg);
+      client->state = CXS_SEND;
+    }
+    // logi_client(client, "[RECV] %d", rc);
+    return rc;
+  }
+  if (client->state == CXS_SEND) {
+    int rc = server_frame_xchg_send(&client->xchg);
+    if (rc == SXR_SUCCESS) {
+      server_frame_xchg_recv_prepare(&client->xchg);
+      client->state = CXS_RECV;
+    }
+    // logi_client(client, "[SEND] %d", rc);
+    return rc;
+  }
+  loge_client(client, "something went horribly wrong");
+  return SXR_FAILURE;
+}
+
+struct server {
+  pollfd_t      *pfd;
+  pollfd_pool_t *pfdpool;
+  list_t         clients;
+};
+
+static int
+server_socket(const char *address, const char *port, const int backlog) {
+  addrinfo_t *ai_hint = &(addrinfo_t) {
+    .ai_family   = PF_UNSPEC,
+    .ai_socktype = SOCK_STREAM,
+    .ai_flags    = AI_PASSIVE
+  };
+  addrinfo_t *ai = null;
+  int rc = getaddrinfo(address, port, ai_hint, &ai);
+  if (rc < 0) {
+    loge("server socket getaddrinfo failure: %s (%d)", gai_strerror(rc), rc);
     return -1;
   }
-  if (sigpfd->revents & POLLIN) {
-    logi("signal pollfd reading...");
-    if (read(sigpfd->fd, siginf, sizeof(*siginf)) != sizeof(*siginf)) {
-      loge_errno("signal pollfd read failure");
-      return -1;
+  int fd = -1;
+  for (addrinfo_t *p = ai; p; p = p->ai_next) {
+    fd = socket(ai->ai_family, ai->ai_socktype | SOCK_NONBLOCK, ai->ai_protocol);
+    if (fd < 0) {
+      loge_errno("server socket failure");
+      continue;
     }
-    return 1;
-  }
-  return 0;
-}
-
-static
-int
-xs_srvpfd_handle(pollfd_t * srvpfd, x_array_t * pfds, x_array_t * actors) {
-  if (srvpfd->revents & POLLERR) {
-    loge("server pollfd error");
-    return -1;
-  }
-
-  if (srvpfd->revents & POLLIN) {
-    logi("server pollfd accepting client...");
-    int actor_fd = accept(srvpfd->fd, NULL, NULL);
-    if (actor_fd < 0) {
-      loge_errno("client accept failure");
-      return -1;
+    int on = 1;
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0) {
+      loge_errno("server socket setsockopt failure");
+      goto __probe_next;
     }
-    logi("client socket unblock...");
-    if (x_fd_add_flag(actor_fd, O_NONBLOCK) < 0) {
-      loge_errno("client socket unblock failure");
-      return -1;
+    if (bind(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
+      loge_errno("server socket bind failure");
+      goto __probe_next;
     }
-    logi("client socket retrieving address info...");
-    sockaddr_storage_t sa_storage = {};
-    socklen_t          sa_storage_sz = sizeof(sa_storage);
-    if (getpeername(actor_fd, as_sockaddr(&sa_storage), &sa_storage_sz) < 0) {
-      loge_errno("client socket getsockname");
-      return -1;
+    if (listen(fd, backlog) < 0) {
+      loge_errno("server socket listen failure");
+      goto __probe_next;
     }
-
-    pollfd_t * actor_pfd = x_array_add_1(pfds, malloc(sizeof(*actor_pfd)));
-    actor_pfd->fd      = actor_fd;
-    actor_pfd->events  = 0;
-    actor_pfd->revents = 0;
-    x_array_add_1(actors, xs_actor_init(actor_pfd));
-
-    char *    in_addr = sockaddr_in_addrstr(&sa_storage);
-    in_port_t in_port = sockaddr_in_port(&sa_storage);
-    logi("client socket ready: %s:%d", in_addr, ntohs(in_port));
+    char      *in_addr = null;
+    in_port_t  in_port = 0;
+    if (getsocknamestr(fd, &in_addr, &in_port) < 0) {
+      loge_errno("server socket getpeername failure");
+      goto __probe_next;
+    }
+    logi("server ready: %s:%u", in_addr, ntohs(in_port));
     free(in_addr);
-    return 1;
+    break;
+
+  __probe_next:
+    close(fd);
+    fd = -1;
   }
-  return 0;
+  freeaddrinfo(ai);
+  return fd;
 }
 
-static
-int
-xs_actors_handle(x_array_t * pfds, x_array_t * actors) {
-  bool slimed = false;
-  for (size_t i = 0; i < actors->len; ++i) {
-    xs_actor_t * actor = x_array_get(actors, i);
-    int rc = xs_actor_call(actor);
-    if (rc < 0) {
-      x_array_del_fast(actors, i);
-      x_array_del_fast(pfds, i + 2);
-      slimed = true;
-    }
+static int
+server_client_init(server_t *server) {
+  if (!(server->pfd->revents & POLLIN)) {
+    return SXR_IGNORED;
   }
-  return slimed ? 1 : 0;
+  pollfd_t *pfd = pollfd_pool_borrow(server->pfdpool);
+  if (!pfd) {
+    loge("client failed to borrow pollfd");
+    return SXR_FAILURE;
+  };
+  if ((pfd->fd = accept4(server->pfd->fd, null, null, SOCK_NONBLOCK)) < 0) {
+    loge_errno("client socket accept failure");
+    goto __err;
+   }
+  char      *addr;
+  in_port_t  port;
+  if (getpeernamestr(pfd->fd, &addr, &port) < 0) {
+    loge_errno("client socket getpeername failure");
+    goto __err;
+  }
+
+  client_t *client = malloc(sizeof(*client));
+  client_init(client, pfd, addr, ntohs(port));
+  list_insert_tail(&client->node, &server->clients);
+
+  if (pollfd_pool_capped(server->pfdpool) && server->pfd->fd > 0) {
+    logi("server pollfd DISABLED...");
+    server->pfd->fd = -server->pfd->fd;
+  }
+  return SXR_SUCCESS;
+
+__err:
+  pollfd_pool_return(server->pfdpool, pfd);
+  return SXR_FAILURE;
 }
 
-int
-main(int argc, char ** argv) {
-  xs_args_t args = xs_args_default();
-  xs_args_parse(argc, argv, &args);
+static int
+server_client_xchg(server_t *server) {
+  int rc = SXR_IGNORED;
+  client_t *client, *temp;
+  clients_foreach_safe(client, temp, &server->clients) {
+    switch (rc = client_xchg(client)) {
+      case SXR_PARTIAL: __fallthrough;
+      case SXR_SUCCESS: __fallthrough;
+      case SXR_IGNORED: break;
+      default: {
+        switch (rc) {
+          case SXR_RUPTURE: logi_client(client, "rupture"); break;
+          case SXR_FAILURE: loge_client(client, "failure"); break;
+          default:          loge_client(client, "unknown"); break;
+        }
+        pollfd_pool_return(server->pfdpool, client->xchg.ctx.pfd);
+        list_unlink(&client->node);
+        client_free(client);
 
-  x_array_t * pfds = x_array_init(sizeof(pollfd_t), xs_pollfd_disp, (size_t)(args.clients_size) + 2);
-  x_array_t * actors = x_array_init(xs_actor_size(), xs_actor_disp, (size_t)(args.clients_size));
-
-  logi("signal fd setup...");
-  pollfd_t * sigpfd = x_array_add_1(pfds, malloc(sizeof(*sigpfd)));
-  siginf_t   siginf = {};
-  sigset_t   sigset = {};
-  sigaddset(&sigset, SIGINT);
-  sigaddset(&sigset, SIGQUIT);
-  sigaddset(&sigset, SIGTERM);
-  sigaddset(&sigset, SIGKILL);
-  if (sigprocmask(SIG_SETMASK, &sigset, NULL) < 0) {
-    loge_errno("sigprocmasc failure");
-    goto __end;
-  }
-  if ((sigpfd->fd = signalfd(-1, &sigset, 0)) < 0) {
-    loge_errno("signalfd failure");
-    goto __end;
-  }
-  sigpfd->events = POLLIN;
-
-  logi("server fd setup...");
-  pollfd_t * srvpfd = x_array_add_1(pfds, malloc(sizeof(*srvpfd)));
-  if ((srvpfd->fd = xs_socket(args.address, args.port, args.backlog)) < 0) {
-    loge("xs_socket failure");
-    goto __end;
-  }
-  srvpfd->events = POLLIN;
-
-  while (1) {
-    xs_pollfds_revents_reset(pfds);
-    if (poll(pfds->buf, pfds->len, -1) < 0) {
-      loge_errno("poll failure");
-      goto __end;
-    }
-
-    switch (xs_sigpfd_handle(sigpfd, &siginf)) {
-      case  1: goto __sig;    // signal received
-      case  0: break;         // ignored
-      case -1: __fallthrough; // failure
-      default: goto __end;    // unknown
-    }
-
-    bool growed = false;
-    switch (xs_srvpfd_handle(srvpfd, pfds, actors)) {
-      case  1: growed = true; // actor created
-      case  0: break;         // ignored
-      case -1: __fallthrough; // failure
-      default: goto __end;    // unknown
-    }
-    if (growed && pfds->len == pfds->cap) {
-      logi("clients capacity reached...");
-      if (args.clients_grow) {
-        logi("clients capacity grow...");
-        x_array_grow(pfds);
-        x_array_grow(actors);
-      } else {
-        logi("server fd disabled...");
-        srvpfd->fd = -srvpfd->fd;
+        if (server->pfd->fd < 0) {
+          logi("server pollfd ENABLED...");
+          server->pfd->fd = -server->pfd->fd;
+        }
       }
     }
+  }
+  return SXR_IGNORED;
+}
 
-    bool slimed = false;
-    switch (xs_actors_handle(pfds, actors)) {
-      case  1: slimed = true; // actor removed
-      case  0: break;         // ignored
-      default: goto __end;    // unknown
-    }
-    if (slimed && !args.clients_grow) {
-      logi("server fd enabled...");
-      sigpfd->fd = -sigpfd->fd;
-    }
+server_t *
+server_init(const server_args_t *args, pollfd_pool_t *pfdpool) {
+  assert(args);
+  assert(pfdpool);
+
+  pollfd_t *pfd = pollfd_pool_borrow(pfdpool);
+  if (!pfd) {
+    loge("server failed to borrow pollfd");
+    return null;
+  }
+  if ((pfd->fd = server_socket(args->address, args->port, args->backlog)) < 0) {
+    loge("server failed to create socket");
+    pollfd_pool_return(pfdpool, pfd);
+    return null;
+  }
+  server_t *ret = malloc(sizeof(*ret));
+  ret->pfd = pfd;
+  ret->pfd->events = POLLIN;
+  ret->pfd->revents = 0;
+  ret->pfdpool = pfdpool;
+  ret->clients = list_root(&ret->clients);
+  return ret;
+}
+
+int
+server_call(server_t *server) {
+  if (server->pfd->revents & POLLERR) {
+    loge("server pollfd POLLERR");
+    return SXR_FAILURE;
+  }
+  if (server->pfd->revents & POLLNVAL) {
+    loge("server pollfd POLLNVAL");
+    return SXR_FAILURE;
+  }
+  if (server->pfd->revents & POLLHUP) {
+    loge("server pollfd POLLHUP");
+    return SXR_RUPTURE;
   }
 
-__sig:
-  logi(
-    "signal received: %s (%d)",
-    strsignal((i32)siginf.ssi_signo), (i32)siginf.ssi_signo
-  );
+  int rc = 0;
+  switch ((rc = server_client_init(server))) {
+    case SXR_IGNORED: break;
+    default:          return rc;
+  }
+  switch ((rc = server_client_xchg(server))) {
+    case SXR_IGNORED: break;
+    default:          return rc;
+  }
+  return SXR_IGNORED;
+}
 
-__end:
-  x_array_free(actors, false);
-  x_array_free(pfds, false);
-  return 0;
+void
+server_free(server_t *server) {
+  if (!server) return;
+  // todo: clients free
+  free(server);
 }

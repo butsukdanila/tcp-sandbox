@@ -1,13 +1,12 @@
 #include "x-client-args.h"
 #include "x-server-api.h"
-#include "x-server-api-xchg.h"
 #include "x-logs.h"
 #include "x-util.h"
 #include "x-inet.h"
+#include "x-poll-pool.h"
 #include "x-poll-timer.h"
 #include "x-poll-signal.h"
 
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -75,8 +74,13 @@ main(int argc, char **argv) {
     (/*client pollfd*/ 1)
   );
 
+  sigset_t sigset = {};
+  sigaddset(&sigset, SIGINT);
+  sigaddset(&sigset, SIGTERM);
+  sigaddset(&sigset, SIGQUIT);
+  sigaddset(&sigset, SIGKILL);
   pollfd_t *sigpfd = pollfd_pool_borrow(pfdpool);
-  if ((signal_pollfd_init(sigpfd, SIG_BLOCK, -1, O_NONBLOCK, SIGINT, SIGTERM)) < 0) {
+  if ((signal_pollfd_init(sigpfd, SIG_BLOCK, &sigset, -1, O_NONBLOCK)) < 0) {
     goto __end0;
   }
   signalfd_siginfo_t siginf = {};
@@ -92,15 +96,15 @@ main(int argc, char **argv) {
     strfmt("client[%d]", getpid());
   size_t message_sz = str_sz(message);
 
-  server_frame_xchg_t req = {
-    .ctx.pfd = clipfd,
-    .frame = server_frame_req(SOPC_MESSAGE)
+  server_xchg_t req = {
+    .pfdxg.pfd = clipfd,
+    .frame = server_frame_req(SREQ_OP_MESSAGE)
   };
   server_frame_body_set(&req.frame, message, message_sz);
-  server_frame_xchg_send_prep(&req);
+  server_xchg_send_prep(&req);
 
-  server_frame_xchg_t rsp = {
-    .ctx.pfd = clipfd
+  server_xchg_t rsp = {
+    .pfdxg.pfd = clipfd
   };
 
   pollfd_t *tmrpfd = pollfd_pool_borrow(pfdpool);
@@ -137,9 +141,9 @@ main(int argc, char **argv) {
         goto __next;
       }
       case CXS_SEND: {
-        switch (server_frame_xchg_send(&req)) {
+        switch (server_xchg_send(&req)) {
           case SUCCESS: {
-            server_frame_xchg_recv_prep(&rsp);
+            server_xchg_recv_prep(&rsp);
             state = CXS_RECV;
             logi("done");
             __fallthrough;
@@ -150,14 +154,14 @@ main(int argc, char **argv) {
         }
       }
       case CXS_RECV: {
-        switch (server_frame_xchg_recv(&rsp)) {
+        switch (server_xchg_recv(&rsp)) {
           case SUCCESS: {
-            if (rsp.frame.head.op_flag & SOPF_FAILURE) {
+            if (rsp.frame.head.rsp.status & SRSP_ST_FAILURE) {
               server_error_t * err = rsp.frame.body;
               loge("server error [%u][%u]: %s", err->auth, err->code, err->text);
               goto __end1;
             }
-            server_frame_xchg_send_prep(&req);
+            server_xchg_send_prep(&req);
             state = CXS_WAIT;
             logi("wait");
             __fallthrough;
@@ -178,7 +182,7 @@ __sig:
 
 __end1:
   free(message);
-  server_frame_xchg_disp(&req);
+  server_xchg_disp(&req);
 __end0:
   pollfd_pool_free(pfdpool);
   return 1;

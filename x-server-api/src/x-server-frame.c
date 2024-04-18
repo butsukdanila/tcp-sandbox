@@ -1,8 +1,5 @@
-#include "x-server-api.h"
+#include "x-server-frame.h"
 #include "x-logs.h"
-
-#include <sys/fcntl.h>
-#include <sys/socket.h>
 
 #include <stdlib.h>
 #include <stdarg.h>
@@ -39,24 +36,4 @@ void
 server_frame_body_set(server_frame_t *frame, const void *buf, size_t buf_sz) {
   server_frame_body_realloc(frame, (u32)buf_sz);
   memcpy(frame->body, buf, frame->head.body_sz);
-}
-
-void
-server_error_set0(server_frame_t *frame, const server_error_t *err) {
-  frame->head.op_flag = SOPF_FAILURE;
-  server_frame_body_set(frame, err, sizeof(*err));
-  loge("server error [%u][%u]: %s", err->auth, err->code, err->text);
-}
-
-void
-server_error_set1(server_frame_t *frame, u16 auth, u16 code, const char *format, ...) {
-  server_error_t err = {
-    .auth = auth,
-    .code = code,
-  };
-  va_list args;
-  va_start(args, format);
-  vsnprintf(err.text, sizeof(err.text), format, args);
-  va_end(args);
-  server_error_set0(frame, &err);
 }

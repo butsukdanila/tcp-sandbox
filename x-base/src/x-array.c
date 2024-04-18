@@ -56,9 +56,6 @@ array_grow(array_t *arr) {
 void *
 array_free_ext(array_t *arr, bool extract) {
   __array_ext_t *__arr = (__array_ext_t *)arr;
-  if (!__arr) {
-    return null;
-  }
   void *ret = __arr->buf;
   if (!extract) {
     if (__arr->cfg.obj_disp) {
@@ -81,16 +78,14 @@ array_free(array_t *__arr) {
 void *
 array_get(array_t *arr, size_t idx) {
   __array_ext_t *__arr = (__array_ext_t *)arr;
-  assert(idx < __arr->len);
+  assert(__arr->len > idx);
   return __array_get(__arr, idx);
 }
 
 void *
 array_set(array_t *arr, size_t idx, void *objs, size_t objs_len) {
   __array_ext_t *__arr = (__array_ext_t *)arr;
-  assert(objs_len);
-  assert(idx + objs_len < __arr->len);
-
+  assert(__arr->len > idx + objs_len);
   return memcpy(
     __array_get(__arr, idx),
     objs,
@@ -101,8 +96,6 @@ array_set(array_t *arr, size_t idx, void *objs, size_t objs_len) {
 void *
 array_add(array_t *arr, void *objs, size_t objs_len) {
   __array_ext_t *__arr = (__array_ext_t *)arr;
-  assert(objs_len);
-
   __array_maybe_extend(__arr, objs_len);
   void *ret = memcpy(
     __array_get(__arr, __arr->len),
@@ -125,7 +118,6 @@ array_req(array_t *arr) {
 void
 array_del(array_t *arr, size_t idx) {
   __array_ext_t *__arr = (__array_ext_t *)arr;
-  assert(__arr);
   assert(__arr->len > idx);
 
   if (__arr->cfg.obj_disp) {
@@ -145,7 +137,7 @@ array_del(array_t *arr, size_t idx) {
 void
 array_del_fast(array_t *arr, size_t idx) {
   __array_ext_t *__arr = (__array_ext_t *)arr;
-  assert(idx < __arr->len);
+  assert(__arr->len < idx);
 
   if (__arr->cfg.obj_disp) {
     __arr->cfg.obj_disp(__array_get(__arr, idx));

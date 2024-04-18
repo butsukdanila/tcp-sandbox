@@ -4,8 +4,8 @@ pushd $(dirname $0) &> /dev/null
 
 CMAKE_FLAGS=(
   "-DCMAKE_BUILD_TYPE=Debug"
-  "-DCMAKE_C_FLAGS=-std=gnu99"
   "-DCMAKE_EXPORT_COMPILE_COMMANDS=1"
+  "-DUSE_ASAN=1"
 )
 
 function __build() {

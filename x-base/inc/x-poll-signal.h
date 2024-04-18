@@ -9,7 +9,7 @@
 typedef struct signalfd_siginfo signalfd_siginfo_t;
 
 int
-signal_pollfd_init(pollfd_t *pfd, int how, int fd, int flags, /*signos*/ ...);
+signal_pollfd_init(pollfd_t *pfd, int how, sigset_t * set, int fd, int flags);
 
 int
 signal_pollfd_call(const pollfd_t *pfd, signalfd_siginfo_t *siginfo);

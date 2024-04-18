@@ -3,6 +3,7 @@
 
 #include "x-poll.h"
 #include <sys/time.h>
+#include <sys/timerfd.h>
 
 int
 timer_pollfd_init(pollfd_t *pfd, time_t delay_sec, time_t interval_sec, int flags);

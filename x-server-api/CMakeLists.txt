@@ -1,11 +1,12 @@
 set(X_SERVER_API x-server-api)
 
-add_library(${X_SERVER_API} 
+add_library(${X_SERVER_API}
   SHARED
-    ${CMAKE_CURRENT_LIST_DIR}/src/x-server-api.c
-		${CMAKE_CURRENT_LIST_DIR}/src/x-server-api-xchg.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/x-server-frame.c
+		${CMAKE_CURRENT_LIST_DIR}/src/x-server-error.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/x-server-xchg.c
 )
-target_include_directories(${X_SERVER_API} 
+target_include_directories(${X_SERVER_API}
   PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/inc
 )

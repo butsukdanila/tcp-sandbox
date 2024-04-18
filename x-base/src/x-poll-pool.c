@@ -1,12 +1,9 @@
-#include "x-poll.h"
+#include "x-poll-pool.h"
 #include "x-array.h"
 
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
-
-#include <sys/fcntl.h>
-#include <sys/socket.h>
 
 struct pollfd_pool {
   array_t *arr;

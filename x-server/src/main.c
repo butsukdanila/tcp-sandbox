@@ -1,8 +1,8 @@
 #include "x-server.h"
 #include "x-server-args.h"
-#include "x-server-api-xchg.h"
 #include "x-logs.h"
 #include "x-util.h"
+#include "x-poll-pool.h"
 #include "x-poll-signal.h"
 
 #include <stdlib.h>
@@ -23,17 +23,22 @@ main(int argc, char **argv) {
     ))
   );
 
+  sigset_t sigset = {};
+  sigaddset(&sigset, SIGINT);
+  sigaddset(&sigset, SIGTERM);
+  sigaddset(&sigset, SIGQUIT);
+  sigaddset(&sigset, SIGKILL);
   pollfd_t *sigpfd = pollfd_pool_borrow(pfdpool);
-  if (signal_pollfd_init(sigpfd, SIG_BLOCK, -1, O_NONBLOCK, SIGINT, SIGTERM) < 0) {
+  if ((signal_pollfd_init(sigpfd, SIG_BLOCK, &sigset, -1, O_NONBLOCK)) < 0) {
     goto __end;
   }
+  signalfd_siginfo_t siginf = {};
 
   server_t *server = server_init(args, pfdpool);
   if (!server) {
     goto __end;
   }
 
-  signalfd_siginfo_t siginf = {};
   while (1) {
     if (pollfd_pool_poll(pfdpool, -1) < 0) {
       goto __end;

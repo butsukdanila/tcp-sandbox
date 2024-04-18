@@ -44,13 +44,13 @@ list_insert_tail(list_t *node, list_t *root) {
   list_insert(node, root->prev, root);
 }
 
-#define list_foreach(_node, _root) \
+#define list_for_each(_node, _root) \
   for (_node  = (_root)->next; \
        _node != (_root); \
        _node  = (_node)->next)
 
 #define list_data(_node, _type, _member) \
-  containerof(_node, _type, _member)
+  container_of(_node, _type, _member)
 
 #define list_head_data(_root, _type, _member) \
   list_data((_root)->next, _type, _member)
@@ -64,12 +64,12 @@ list_insert_tail(list_t *node, list_t *root) {
 #define list_prev_data(_data, _member) \
   list_data((_data)->_member.prev, typeof(*(_data)), _member)
 
-#define list_foreach_data(_data, _root, _member) \
+#define list_for_each_data(_data, _root, _member) \
   for (_data = list_head_data(_root, typeof(*_data), _member); \
       &_data->_member != (_root); \
        _data = list_next_data(_data, _member))
 
-#define list_foreach_data_safe(_data, _temp, _head, _member) \
+#define list_for_each_data_safe(_data, _temp, _head, _member) \
   for (_data = list_head_data(_head, typeof(*_data), _member), \
        _temp = list_next_data(_data, _member); \
       &_data->_member != (_head); \

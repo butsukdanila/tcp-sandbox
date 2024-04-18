@@ -31,7 +31,7 @@ typedef unsigned long long int u64;
 
 #define null (void *)0
 
-#define containerof(ptr, type, member) \
+#define container_of(ptr, type, member) \
   ((type *)((void *)(ptr) - offsetof(type, member)))
 
 #define __unused      __attribute__((unused))

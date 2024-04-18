@@ -2,7 +2,7 @@
 #define __X_SERVER_H__
 
 #include "x-server-args.h"
-#include "x-poll.h"
+#include "x-poll-pool.h"
 
 struct server;
 typedef struct server server_t;

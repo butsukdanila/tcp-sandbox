@@ -14,3 +14,9 @@ target_link_libraries(${X_SERVER}
     ${X_BASE_LIB}
     ${X_SERVER_API_LIB}
 )
+
+option(USE_ASAN "enable address sanitizer" OFF)
+if (USE_ASAN)
+  target_link_libraries(${X_SERVER} PRIVATE libasan.a m)
+  target_compile_options(${X_SERVER} PRIVATE -fsanitize=address -fno-omit-frame-pointer -static-libasan)
+endif()

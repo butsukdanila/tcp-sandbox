@@ -4,23 +4,32 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-void
-server_xchg_recv_prep(server_xchg_t *xchg) {
-  server_frame_zero(&xchg->frame);
+static void
+server_xchg_prep_head(server_xchg_t *xchg) {
   xchg->state = SXG_ST_HEAD;
-  xchg->pfdxg.pfd->events = POLLIN;
   xchg->pfdxg.buf = &xchg->frame.head;
   xchg->pfdxg.trg_sz = sizeof(xchg->frame.head);
   xchg->pfdxg.cur_sz = 0;
 }
 
+static void
+server_xchg_prep_body(server_xchg_t *xchg) {
+  xchg->state = SXG_ST_BODY;
+  xchg->pfdxg.buf = xchg->frame.body;
+  xchg->pfdxg.trg_sz = xchg->frame.head.body_sz;
+  xchg->pfdxg.cur_sz = 0;
+}
+
+void
+server_xchg_recv_prep(server_xchg_t *xchg) {
+  xchg->pfdxg.pfd->events = POLLIN;
+  server_xchg_prep_head(xchg);
+}
+
 void
 server_xchg_send_prep(server_xchg_t *xchg) {
-  xchg->state = SXG_ST_HEAD;
   xchg->pfdxg.pfd->events = POLLOUT;
-  xchg->pfdxg.buf = &xchg->frame.head;
-  xchg->pfdxg.trg_sz = sizeof(xchg->frame.head);
-  xchg->pfdxg.cur_sz = 0;
+  server_xchg_prep_head(xchg);
 }
 
 void
@@ -40,20 +49,14 @@ server_xchg_recv(server_xchg_t *xchg) {
     default:      return rc;
   }
   switch (xchg->state) {
-    // request head received
     case SXG_ST_HEAD: {
       if (xchg->frame.head.body_sz) {
-        xchg->state = SXG_ST_BODY;
-        xchg->pfdxg.buf = server_frame_body_realloc(&xchg->frame, xchg->frame.head.body_sz);
-        xchg->pfdxg.trg_sz = xchg->frame.head.body_sz;
-        xchg->pfdxg.cur_sz = 0;
-        // body recv required
+        server_frame_body_realloc(&xchg->frame, xchg->frame.head.body_sz);
+        server_xchg_prep_body(xchg);
         return PARTIAL;
       }
-      // body ignored
-      __fallthrough;
+      __fallthrough; // body ignored
     }
-    // request body received
     case SXG_ST_BODY: {
       return SUCCESS;
     }
@@ -73,20 +76,13 @@ server_xchg_send(server_xchg_t *xchg) {
     default:      return rc;
   }
   switch (xchg->state) {
-    // response head sent
     case SXG_ST_HEAD: {
       if (xchg->frame.head.body_sz) {
-        xchg->state = SXG_ST_BODY;
-        xchg->pfdxg.buf = xchg->frame.body;
-        xchg->pfdxg.trg_sz = xchg->frame.head.body_sz;
-        xchg->pfdxg.cur_sz = 0;
-        // body send required
+        server_xchg_prep_body(xchg);
         return PARTIAL;
       }
-      // body ignored
-      __fallthrough;
+      __fallthrough; // body ignored
     }
-    // response body sent
     case SXG_ST_BODY: {
       return SUCCESS;
     }

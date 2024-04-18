@@ -41,6 +41,12 @@ struct server_frame {
 typedef struct server_frame server_frame_t;
 
 void
+server_frame_head_zero(server_frame_t *frame);
+
+void
+server_frame_body_zero(server_frame_t *frame);
+
+void
 server_frame_zero(server_frame_t *frame);
 
 void

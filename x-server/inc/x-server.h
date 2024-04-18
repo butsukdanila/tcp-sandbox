@@ -8,7 +8,7 @@ struct server;
 typedef struct server server_t;
 
 server_t *
-server_init(const server_args_t *args, pollfd_pool_t *pfdpool);
+server_new(const server_args_t *args, pollfd_pool_t *pfdpool);
 
 int
 server_xchg(server_t *server);

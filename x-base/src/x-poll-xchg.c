@@ -42,7 +42,7 @@ pollfd_xchg_recv(pollfd_xchg_t *pfdx) {
     if (rcv == 0) {
       return RUPTURE;
     }
-    buf         += (size_t)rcv;
+    buf          += (size_t)rcv;
     pfdx->cur_sz += (size_t)rcv;
   } while (!nbk && pfdx->cur_sz < pfdx->trg_sz);
 

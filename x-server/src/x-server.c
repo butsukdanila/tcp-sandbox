@@ -10,36 +10,38 @@
 #include <unistd.h>
 
 typedef enum {
-  WXG_ST_RECV = 0,
-  WXG_ST_SEND = 1,
-} worker_xchg_state_t;
+  WST_RECV = 0,
+  WST_SEND = 1,
+} worker_state_t;
 
 typedef struct {
-  worker_xchg_state_t  state;
-  server_xchg_t        xchg;
-  char                *addr;
-  in_port_t            port;
-  list_t               node;
-  size_t               msgc;
+  pollfd_t       *pfd;
+  char           *addr;
+  in_port_t       port;
+  worker_state_t  state;
+  server_xchg_t   xchg;
+  size_t          msgc;
+  list_t          node;
 } worker_t;
 
 #define worker_for_each_safe(_data, _temp, _head) \
   list_for_each_data_safe(_data, _temp, _head, node)
 
 #define logi_worker(_a, _f, ...) \
-  logi("actor[%d] " _f, (_a)->port, ##__VA_ARGS__)
+  logi("worker[%d] " _f, (_a)->port, ##__VA_ARGS__)
 
 #define loge_worker(_a, _f, ...) \
-  loge("actor[%d] " _f, (_a)->port, ##__VA_ARGS__)
+  loge("worker[%d] " _f, (_a)->port, ##__VA_ARGS__)
 
 static worker_t *
-worker_init(pollfd_t *pfd, char *addr, in_port_t port) {
+worker_new(pollfd_t *pfd, char *addr, in_port_t port) {
   worker_t *worker = malloc(sizeof(*worker));
-  worker->state = WXG_ST_RECV;
-  worker->xchg = server_xchg_init(pfd);
-  server_xchg_recv_prep(&worker->xchg);
+  worker->pfd = pfd;
   worker->addr = addr;
   worker->port = port;
+  worker->state = WST_RECV;
+  worker->xchg = server_xchg_init(worker->pfd);
+  server_xchg_recv_prep(&worker->xchg);
   worker->msgc = 0;
   return worker;
 }
@@ -54,6 +56,7 @@ worker_free(worker_t *worker) {
 
 static void
 worker_op_ping(worker_t *worker __unused, server_frame_t *rsp) {
+  logi_worker(worker, "PING");
   static const char pong[] = "pong";
   server_frame_body_set(rsp, pong, sizeof(pong));
 }
@@ -82,23 +85,24 @@ worker_op_callback(worker_t *worker) {
 
 static int
 worker_xchg(worker_t *worker) {
-  if (worker->state == WXG_ST_RECV) {
+  if (worker->state == WST_RECV) {
     int rc = server_xchg_recv(&worker->xchg);
     if (rc == SUCCESS) {
       server_frame_t rsp = worker_op_callback(worker);
       server_xchg_disp(&worker->xchg);
       worker->xchg.frame = rsp;
       server_xchg_send_prep(&worker->xchg);
-      worker->state = WXG_ST_SEND;
+      worker->state = WST_SEND;
     }
     // logi_worker(worker, "[RECV] %d", rc);
     return rc;
   }
-  if (worker->state == WXG_ST_SEND) {
+  if (worker->state == WST_SEND) {
     int rc = server_xchg_send(&worker->xchg);
     if (rc == SUCCESS) {
+      server_frame_head_zero(&worker->xchg.frame);
       server_xchg_recv_prep(&worker->xchg);
-      worker->state = WXG_ST_RECV;
+      worker->state = WST_RECV;
     }
     // logi_worker(worker, "[SEND] %d", rc);
     return rc;
@@ -189,7 +193,7 @@ server_worker_init(server_t *server) {
     goto __err;
   }
 
-  worker_t *worker = worker_init(pfd, addr, ntohs(port));
+  worker_t *worker = worker_new(pfd, addr, ntohs(port));
   list_insert_tail(&worker->node, &server->workers);
   logi_worker(worker, "accepted");
 
@@ -219,8 +223,8 @@ server_worker_xchg(server_t *server) {
           case FAILURE: loge_worker(worker, "failure"); break;
           default:      loge_worker(worker, "unknown"); break;
         }
-        pollfd_pool_return(server->pfdpool, worker->xchg.pfdxg.pfd);
         list_unlink(&worker->node);
+        pollfd_pool_return(server->pfdpool, worker->pfd);
         worker_free(worker);
 
         if (server->pfd->fd < 0) {
@@ -234,7 +238,7 @@ server_worker_xchg(server_t *server) {
 }
 
 server_t *
-server_init(const server_args_t *args, pollfd_pool_t *pfdpool) {
+server_new(const server_args_t *args, pollfd_pool_t *pfdpool) {
   pollfd_t *pfd = pollfd_pool_borrow(pfdpool);
   if (!pfd) {
     loge("server failed to borrow pollfd");
@@ -246,7 +250,6 @@ server_init(const server_args_t *args, pollfd_pool_t *pfdpool) {
     return null;
   }
   server_t *server = malloc(sizeof(*server));
-  memset(server, 0, sizeof(*server));
   server->pfd = pfd;
   server->pfd->events = POLLIN;
   server->pfd->revents = 0;
@@ -270,7 +273,7 @@ server_xchg(server_t *server) {
     return FAILURE;
   }
 
-  int rc = 0;
+  int rc = IGNORED;
   switch ((rc = server_worker_init(server))) {
     case IGNORED: break;
     default:      return rc;

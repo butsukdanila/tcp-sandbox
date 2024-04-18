@@ -6,12 +6,20 @@
 #include <string.h>
 
 void
+server_frame_head_zero(server_frame_t *frame) {
+  memset(&frame->head, 0, sizeof(frame->head));
+}
+
+void
+server_frame_body_zero(server_frame_t *frame) {
+  if (!frame->body || !frame->head.body_sz) return;
+  memset(frame->body, 0, frame->head.body_sz);
+}
+
+void
 server_frame_zero(server_frame_t *frame) {
-  if (!frame) return;
-  if (frame->body && frame->head.body_sz) {
-    memset(frame->body, 0, frame->head.body_sz);
-  }
-  memset(frame, 0, sizeof(*frame));
+  server_frame_head_zero(frame);
+  server_frame_body_zero(frame);
 }
 
 void

@@ -24,3 +24,11 @@ server_error_set1(server_frame_t *frame, u16 auth, u16 code, const char *format,
   va_end(args);
   server_error_set0(frame, &err);
 }
+
+const server_error_t *
+server_error_get(server_frame_t *frame) {
+  if (!frame) return null;
+  if (frame->head.type != SFT_RSP) return null;
+  if (frame->head.rsp.status != SRSP_ST_FAILURE) return null;
+  return frame->body;
+}

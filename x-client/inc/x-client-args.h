@@ -4,22 +4,28 @@
 #include "x-types.h"
 #include <sys/time.h>
 
-#define XC_ADDRESS_DEF "127.0.0.1"
-#define XC_PORT_DEF    "4200"
-#define XC_TIMEOUT_DEF 5
+#define ADDRESS_DEF  "127.0.0.1"
+#define PORT_DEF     "4200"
+#define COUNT_DEF    -1
+#define DELAY_DEF    0
+#define INTERVAL_DEF 0
 
 typedef struct {
   char   *address;
   char   *port;
   char   *message;
-  time_t  timeout;
+  i32     count;
+  time_t  delay;
+  time_t  interval;
 } client_args_t;
 
-#define client_args_default()  \
-  (client_args_t) {            \
-    .address = XC_ADDRESS_DEF, \
-    .port    = XC_PORT_DEF,    \
-    .timeout = XC_TIMEOUT_DEF  \
+#define client_args_default() \
+  (client_args_t) {           \
+    .address  = ADDRESS_DEF,  \
+    .port     = PORT_DEF,     \
+    .count    = COUNT_DEF,    \
+    .delay    = DELAY_DEF,    \
+    .interval = INTERVAL_DEF  \
   }
 
 void

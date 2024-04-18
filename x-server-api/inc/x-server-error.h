@@ -32,4 +32,7 @@ server_error_set1(server_frame_t *frame, u16 auth, u16 code, const char *format,
 #define server_error_sys(_frame, _code, _format, ...) \
   server_error_set1(_frame, SERR_AUTH_SYS, (u16)_code, _format, ##__VA_ARGS__)
 
+const server_error_t *
+server_error_get(server_frame_t *frame);
+
 #endif//__X_SERVER_ERROR_H__

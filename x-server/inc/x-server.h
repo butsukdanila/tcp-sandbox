@@ -11,7 +11,7 @@ server_t *
 server_init(const server_args_t *args, pollfd_pool_t *pfdpool);
 
 int
-server_call(server_t *server);
+server_xchg(server_t *server);
 
 void
 server_free(server_t *server);

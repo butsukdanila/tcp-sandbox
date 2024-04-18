@@ -15,7 +15,7 @@ typedef enum {
   CXS_WAIT = 0,
   CXS_RECV = 1,
   CXS_SEND = 2,
-} client_xchg_state_t;
+} actor_xchg_state_t;
 
 static int
 client_socket(const char *address, const char *port) {
@@ -119,7 +119,7 @@ main(int argc, char **argv) {
       goto __end1;
     }
 
-    switch (signal_pollfd_call(sigpfd, &siginf)) {
+    switch (signal_pollfd_read(sigpfd, &siginf)) {
       case IGNORED: break;
       case SUCCESS: goto __sig;
       default:      goto __end1;

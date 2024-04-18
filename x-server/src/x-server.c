@@ -8,79 +8,70 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <limits.h>
 
 typedef enum {
-  CXS_RECV = 0,
-  CXS_SEND = 1,
-} client_xchg_state_t;
+  WXG_ST_RECV = 0,
+  WXG_ST_SEND = 1,
+} worker_xchg_state_t;
 
 typedef struct {
-  client_xchg_state_t  state;
+  worker_xchg_state_t  state;
   server_xchg_t        xchg;
   char                *addr;
   in_port_t            port;
-  size_t               msgc;
   list_t               node;
-} client_t;
+  size_t               msgc;
+} worker_t;
 
-#define client_for_each_safe(_data, _temp, _head) \
+#define worker_for_each_safe(_data, _temp, _head) \
   list_for_each_data_safe(_data, _temp, _head, node)
 
-#define logi_client(_a, _f, ...) \
-  logi("client[%d] " _f, (_a)->port, ##__VA_ARGS__)
+#define logi_worker(_a, _f, ...) \
+  logi("actor[%d] " _f, (_a)->port, ##__VA_ARGS__)
 
-#define loge_client(_a, _f, ...) \
-  loge("client[%d] " _f, (_a)->port, ##__VA_ARGS__)
+#define loge_worker(_a, _f, ...) \
+  loge("actor[%d] " _f, (_a)->port, ##__VA_ARGS__)
 
-static client_t *
-client_init(pollfd_t *pfd, char *addr, in_port_t port) {
-  client_t *client = malloc(sizeof(*client));
-  client->state = CXS_RECV;
-  client->xchg = (server_xchg_t) { .pfdxg.pfd = pfd };
-  server_xchg_recv_prep(&client->xchg);
-  client->addr = addr;
-  client->port = port;
-  client->msgc = 0;
-  return client;
+static worker_t *
+worker_init(pollfd_t *pfd, char *addr, in_port_t port) {
+  worker_t *worker = malloc(sizeof(*worker));
+  worker->state = WXG_ST_RECV;
+  worker->xchg = server_xchg_init(pfd);
+  server_xchg_recv_prep(&worker->xchg);
+  worker->addr = addr;
+  worker->port = port;
+  worker->msgc = 0;
+  return worker;
 }
 
 static void
-client_disp(void *obj) {
-  client_t *client = obj;
-  if (!client) return;
-  free(client->addr);
-  server_xchg_disp(&client->xchg);
+worker_free(worker_t *worker) {
+  if (!worker) return;
+  free(worker->addr);
+  server_xchg_disp(&worker->xchg);
+  free(worker);
 }
 
 static void
-client_free(void *obj) {
-  client_t *client = obj;
-  if (!client) return;
-  client_disp(client);
-  free(client);
-}
-
-static void
-server_op_ping(client_t *client __unused, server_frame_t *rsp) {
+worker_op_ping(worker_t *worker __unused, server_frame_t *rsp) {
   static const char pong[] = "pong";
   server_frame_body_set(rsp, pong, sizeof(pong));
 }
 
 static void
-server_op_message(client_t *client, server_frame_t *rsp __unused) {
-  logi_client(client, "MESSAGE[%03zu]: %s",
-    client->msgc++,
-    (char *)client->xchg.frame.body);
+worker_op_message(worker_t *worker, server_frame_t *rsp __unused) {
+  logi_worker(worker, "MESSAGE[%03zu]: %s",
+    worker->msgc++,
+    (char *)worker->xchg.frame.body);
 }
 
 static server_frame_t
-server_op_callback(client_t *client) {
-  const server_frame_t *req = &client->xchg.frame;
+worker_op_callback(worker_t *worker) {
+  const server_frame_t *req = &worker->xchg.frame;
   server_frame_t       *rsp = &server_frame_rsp();
   switch (req->head.req.opcode) {
-    case SREQ_OP_PING:    server_op_ping(client, rsp);    break;
-    case SREQ_OP_MESSAGE: server_op_message(client, rsp); break;
+    case SREQ_OP_PING:    worker_op_ping(worker, rsp);    break;
+    case SREQ_OP_MESSAGE: worker_op_message(worker, rsp); break;
     default: {
       server_error_any(rsp, SERR_NOP, "unknown: %u", req->head.req.opcode);
       break;
@@ -90,36 +81,36 @@ server_op_callback(client_t *client) {
 }
 
 static int
-client_xchg(client_t *client) {
-  if (client->state == CXS_RECV) {
-    int rc = server_xchg_recv(&client->xchg);
+worker_xchg(worker_t *worker) {
+  if (worker->state == WXG_ST_RECV) {
+    int rc = server_xchg_recv(&worker->xchg);
     if (rc == SUCCESS) {
-      server_frame_t rsp = server_op_callback(client);
-      server_xchg_disp(&client->xchg);
-      client->xchg.frame = rsp;
-      server_xchg_send_prep(&client->xchg);
-      client->state = CXS_SEND;
+      server_frame_t rsp = worker_op_callback(worker);
+      server_xchg_disp(&worker->xchg);
+      worker->xchg.frame = rsp;
+      server_xchg_send_prep(&worker->xchg);
+      worker->state = WXG_ST_SEND;
     }
-    // logi_client(client, "[RECV] %d", rc);
+    // logi_worker(worker, "[RECV] %d", rc);
     return rc;
   }
-  if (client->state == CXS_SEND) {
-    int rc = server_xchg_send(&client->xchg);
+  if (worker->state == WXG_ST_SEND) {
+    int rc = server_xchg_send(&worker->xchg);
     if (rc == SUCCESS) {
-      server_xchg_recv_prep(&client->xchg);
-      client->state = CXS_RECV;
+      server_xchg_recv_prep(&worker->xchg);
+      worker->state = WXG_ST_RECV;
     }
-    // logi_client(client, "[SEND] %d", rc);
+    // logi_worker(worker, "[SEND] %d", rc);
     return rc;
   }
-  loge_client(client, "something went horribly wrong");
+  loge_worker(worker, "something went horribly wrong");
   return FAILURE;
 }
 
 struct server {
   pollfd_t      *pfd;
   pollfd_pool_t *pfdpool;
-  list_t         clients;
+  list_t         workers;
 };
 
 static int
@@ -174,33 +165,33 @@ server_socket(const char *address, const char *port, const int backlog) {
 }
 
 static int
-server_client_init(server_t *server) {
+server_worker_init(server_t *server) {
   if (!(server->pfd->revents & POLLIN)) {
     return IGNORED;
   }
   pollfd_t *pfd = pollfd_pool_borrow(server->pfdpool);
   if (!pfd) {
-    loge("client failed to borrow pollfd");
+    loge("worker failed to borrow pollfd");
     return FAILURE;
   }
   if ((pfd->fd = accept(server->pfd->fd, null, null)) < 0) {
-    loge_errno("client socket accept failure");
+    loge_errno("worker socket accept failure");
     goto __err;
   }
   if (fd_addfl(pfd->fd, O_NONBLOCK) < 0) {
-    loge_errno("client socket unblock failure");
+    loge_errno("worker socket unblock failure");
     goto __err;
   }
   char      *addr;
   in_port_t  port;
   if (getpeernamestr(pfd->fd, &addr, &port) < 0) {
-    loge_errno("client socket getpeername failure");
+    loge_errno("worker socket getpeername failure");
     goto __err;
   }
 
-  client_t *client = client_init(pfd, addr, ntohs(port));
-  list_insert_tail(&client->node, &server->clients);
-  logi_client(client, "accepted");
+  worker_t *worker = worker_init(pfd, addr, ntohs(port));
+  list_insert_tail(&worker->node, &server->workers);
+  logi_worker(worker, "accepted");
 
   if (pollfd_pool_capped(server->pfdpool) && server->pfd->fd > 0) {
     logi("server pollfd DISABLED...");
@@ -214,23 +205,23 @@ __err:
 }
 
 static int
-server_client_xchg(server_t *server) {
+server_worker_xchg(server_t *server) {
   int rc = IGNORED;
-  client_t *client, *temp;
-  client_for_each_safe(client, temp, &server->clients) {
-    switch (rc = client_xchg(client)) {
+  worker_t *worker, *temp;
+  worker_for_each_safe(worker, temp, &server->workers) {
+    switch (rc = worker_xchg(worker)) {
       case PARTIAL: __fallthrough;
       case SUCCESS: __fallthrough;
       case IGNORED: break;
       default: {
         switch (rc) {
-          case RUPTURE: logi_client(client, "rupture"); break;
-          case FAILURE: loge_client(client, "failure"); break;
-          default:      loge_client(client, "unknown"); break;
+          case RUPTURE: logi_worker(worker, "rupture"); break;
+          case FAILURE: loge_worker(worker, "failure"); break;
+          default:      loge_worker(worker, "unknown"); break;
         }
-        pollfd_pool_return(server->pfdpool, client->xchg.pfdxg.pfd);
-        list_unlink(&client->node);
-        client_free(client);
+        pollfd_pool_return(server->pfdpool, worker->xchg.pfdxg.pfd);
+        list_unlink(&worker->node);
+        worker_free(worker);
 
         if (server->pfd->fd < 0) {
           logi("server pollfd ENABLED...");
@@ -260,12 +251,12 @@ server_init(const server_args_t *args, pollfd_pool_t *pfdpool) {
   server->pfd->events = POLLIN;
   server->pfd->revents = 0;
   server->pfdpool = pfdpool;
-  server->clients = list_root(&server->clients);
+  server->workers = list_root(&server->workers);
   return server;
 }
 
 int
-server_call(server_t *server) {
+server_xchg(server_t *server) {
   if (server->pfd->revents & POLLERR) {
     loge("server pollfd POLLERR");
     return FAILURE;
@@ -280,11 +271,11 @@ server_call(server_t *server) {
   }
 
   int rc = 0;
-  switch ((rc = server_client_init(server))) {
+  switch ((rc = server_worker_init(server))) {
     case IGNORED: break;
     default:      return rc;
   }
-  switch ((rc = server_client_xchg(server))) {
+  switch ((rc = server_worker_xchg(server))) {
     case IGNORED: break;
     default:      return rc;
   }
@@ -294,10 +285,10 @@ server_call(server_t *server) {
 void
 server_free(server_t *server) {
   if (!server) return;
-  client_t *client, *temp;
-  client_for_each_safe(client, temp, &server->clients) {
-    list_unlink(&client->node);
-    client_free(client);
+  worker_t *worker, *temp;
+  worker_for_each_safe(worker, temp, &server->workers) {
+    list_unlink(&worker->node);
+    worker_free(worker);
   }
   free(server);
 }

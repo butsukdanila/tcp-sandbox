@@ -5,10 +5,6 @@
 #include "x-poll-pool.h"
 #include "x-poll-signal.h"
 
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-
 int
 main(int argc, char **argv) {
   server_args_t *args = &server_args_default();
@@ -44,13 +40,13 @@ main(int argc, char **argv) {
       goto __end;
     }
 
-    switch (signal_pollfd_call(sigpfd, &siginf)) {
+    switch (signal_pollfd_read(sigpfd, &siginf)) {
       case IGNORED: break;
       case SUCCESS: goto __sig;
       default:      goto __end;
     }
 
-    switch (server_call(server)) {
+    switch (server_xchg(server)) {
       case IGNORED: __fallthrough;
       case SUCCESS: break;
       default:      goto __end;

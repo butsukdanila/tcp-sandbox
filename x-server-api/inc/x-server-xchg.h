@@ -31,4 +31,6 @@ server_xchg_recv(server_xchg_t *sxg);
 int
 server_xchg_send(server_xchg_t *sxg);
 
+#define server_xchg_init(_pfd) (server_xchg_t) { .pfdxg.pfd = (_pfd) }
+
 #endif//__X_SERVER_XCHG_H__

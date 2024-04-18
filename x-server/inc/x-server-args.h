@@ -6,7 +6,7 @@
 #define ADDRESS_DEF     "0.0.0.0"
 #define PORT_DEF        "4200"
 #define BACKLOG_DEF     20
-#define CLIENTS_CAP_DEF 1
+#define CLIENTS_CAP_DEF 10
 
 typedef struct {
   char   *address;

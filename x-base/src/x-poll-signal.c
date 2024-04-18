@@ -24,7 +24,7 @@ signal_pollfd_init(pollfd_t *pfd, int how, sigset_t * set, int fd, int flags) {
 }
 
 int
-signal_pollfd_call(const pollfd_t *pfd, signalfd_siginfo_t *siginfo) {
+signal_pollfd_read(const pollfd_t *pfd, signalfd_siginfo_t *siginfo) {
   if (pfd->revents & POLLERR) {
     loge("[signal pollfd] POLLERR");
     return FAILURE;
